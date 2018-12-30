@@ -12,7 +12,7 @@ fn main() {
     let mut width: u32 = 1280;
     let mut height: u32 = 720;
     let use_warp = false;
-    let is_vsync_enabled = true;
+    let is_vsync_enabled = false;
     //let is_fullscreen = false;
 
     // TODO: parse command line args for window width/height and warp mode
