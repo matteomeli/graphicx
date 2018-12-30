@@ -89,7 +89,7 @@ fn main() {
 
     let mut running = true;
     let mut is_resize_requested = false;
-    let mut is_fullscreen_requested = false;
+    let mut fullscreen_toggle_requested = false;
     let mut resize_width: u32 = width;
     let mut resize_height: u32 = height;
 
@@ -105,11 +105,16 @@ fn main() {
                         input:
                             KeyboardInput {
                                 virtual_keycode: Some(VirtualKeyCode::V),
+                                state: ElementState::Released,
                                 modifiers: ModifiersState { alt: true, .. },
                                 ..
                             },
                         ..
                     } => {
+                        println!(
+                            "Received request to toggle vertical sync to {}",
+                            !is_vsync_enabled
+                        );
                         is_vsync_enabled = !is_vsync_enabled;
                     }
                     WindowEvent::KeyboardInput {
@@ -122,7 +127,8 @@ fn main() {
                             },
                         ..
                     } => {
-                        is_fullscreen_requested = true;
+                        println!("Received request to toggle fullscreen");
+                        fullscreen_toggle_requested = true;
                     }
                     WindowEvent::KeyboardInput {
                         input:
@@ -133,10 +139,14 @@ fn main() {
                         ..
                     }
                     | WindowEvent::CloseRequested => {
+                        println!("Received request to close the window");
                         running = false;
                     }
                     WindowEvent::Resized(LogicalSize { width, height }) => {
-                        println!("The window was resized to {}x{}", width, height);
+                        println!(
+                            "Received request to resize the window to {}x{}",
+                            width, height
+                        );
                         is_resize_requested =
                             width as u32 != resize_width || height as u32 != resize_height;
                         if is_resize_requested {
@@ -150,7 +160,7 @@ fn main() {
         });
 
         if is_resize_requested {
-            println!("Resizing...");
+            println!("Resizing!");
             graphicx::resize(
                 device.clone(),
                 command_queue.clone(),
@@ -171,10 +181,10 @@ fn main() {
             is_resize_requested = false;
         }
 
-        if is_fullscreen_requested {
+        if fullscreen_toggle_requested {
             is_fullscreen = !is_fullscreen;
             graphicx::set_fullscreen(&window, is_fullscreen);
-            is_fullscreen_requested = false;
+            fullscreen_toggle_requested = false;
         }
 
         // Update and render
@@ -200,4 +210,6 @@ fn main() {
     println!("Cleanup!");
     graphicx::flush(command_queue.clone(), fence, &mut fence_value, fence_event);
     unsafe { handleapi::CloseHandle(fence_event) };
+
+    println!("Bye!");
 }
