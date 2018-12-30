@@ -735,13 +735,14 @@ pub fn resize(
         // are not being referenced by an in-flight command list.
         flush(command_queue, fence, fence_value, fence_event);
 
-        for i in 0..back_buffers_count {
-            // Any references to the back buffers must be released
-            // before the swap chain can be resized.
-            let back_buffer = &back_buffers[i];
+        // Any references to the back buffers must be released
+        // before the swap chain can be resized.
+        while let Some(back_buffer) = back_buffers.pop() {
             std::mem::drop(back_buffer);
-            back_buffers.pop();
+        }
 
+        // Reset per-frame fence values to the fence value of the current back buffer index
+        for i in 0..back_buffers_count {
             frame_fence_values[i] = frame_fence_values[*current_back_buffer_index];
         }
 
@@ -776,28 +777,24 @@ pub fn resize(
     }
 }
 
-pub fn set_fullscreen(window: winit::Window, is_fullscreen: &mut bool, fullscreen: bool) {
-    if *is_fullscreen != fullscreen {
-        *is_fullscreen = fullscreen;
-
-        if *is_fullscreen {
-            // Turn off decorations
-            window.set_decorations(false);
-            // Make sure window is on top
-            window.set_always_on_top(true);
-            // Maximize window
-            window.set_maximized(true);
+pub fn set_fullscreen(window: &winit::Window, is_fullscreen: bool) {
+    if is_fullscreen {
+        // Turn off decorations
+        window.set_decorations(false);
+        // Make sure window is on top
+        window.set_always_on_top(true);
+        // Maximize window
+        window.set_maximized(true);
+    // Sets the window fullscreen
+    //window.set_fullscreen(Some(window.get_current_monitor()));
+    } else {
+        // Turn off decorations
+        window.set_decorations(true);
+        // Make sure window is on top
+        window.set_always_on_top(false);
+        // Maximize window
+        window.set_maximized(false);
         // Sets the window fullscreen
-        //window.set_fullscreen(Some(window.get_current_monitor()));
-        } else {
-            // Turn off decorations
-            window.set_decorations(true);
-            // Make sure window is on top
-            window.set_always_on_top(false);
-            // Maximize window
-            window.set_maximized(false);
-            // Sets the window fullscreen
-            //window.set_fullscreen(None);
-        }
+        //window.set_fullscreen(None);
     }
 }

@@ -5,15 +5,18 @@ use winapi::shared::windef;
 use winapi::um::{d3d12, handleapi};
 use winit::dpi::LogicalSize;
 use winit::os::windows::WindowExt;
-use winit::{Event, EventsLoop, KeyboardInput, VirtualKeyCode, WindowBuilder, WindowEvent};
+use winit::{
+    ElementState, Event, EventsLoop, KeyboardInput, ModifiersState, VirtualKeyCode, WindowBuilder,
+    WindowEvent,
+};
 use wio::com::ComPtr;
 
 fn main() {
     let mut width: u32 = 1280;
     let mut height: u32 = 720;
     let use_warp = false;
-    let is_vsync_enabled = false;
-    //let is_fullscreen = false;
+    let mut is_vsync_enabled = false;
+    let mut is_fullscreen = false;
 
     // TODO: parse command line args for window width/height and warp mode
 
@@ -85,7 +88,8 @@ fn main() {
     let mut frame_fence_values: [u64; 3] = [0, 0, 0];
 
     let mut running = true;
-    let mut need_resize = false;
+    let mut is_resize_requested = false;
+    let mut is_fullscreen_requested = false;
     let mut resize_width: u32 = width;
     let mut resize_height: u32 = height;
 
@@ -100,20 +104,42 @@ fn main() {
                     WindowEvent::KeyboardInput {
                         input:
                             KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::V),
+                                modifiers: ModifiersState { alt: true, .. },
+                                ..
+                            },
+                        ..
+                    } => {
+                        is_vsync_enabled = !is_vsync_enabled;
+                    }
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::F),
+                                state: ElementState::Released,
+                                modifiers: ModifiersState { alt: true, .. },
+                                ..
+                            },
+                        ..
+                    } => {
+                        is_fullscreen_requested = true;
+                    }
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
                                 virtual_keycode: Some(VirtualKeyCode::Escape),
                                 ..
                             },
                         ..
                     }
                     | WindowEvent::CloseRequested => {
-                        println!("The close button was pressed");
                         running = false;
                     }
                     WindowEvent::Resized(LogicalSize { width, height }) => {
                         println!("The window was resized to {}x{}", width, height);
-                        need_resize =
+                        is_resize_requested =
                             width as u32 != resize_width || height as u32 != resize_height;
-                        if need_resize {
+                        if is_resize_requested {
                             resize_width = width as _;
                             resize_height = height as _;
                         }
@@ -123,7 +149,7 @@ fn main() {
             }
         });
 
-        if need_resize {
+        if is_resize_requested {
             println!("Resizing...");
             graphicx::resize(
                 device.clone(),
@@ -142,7 +168,13 @@ fn main() {
                 resize_width,
                 resize_height,
             );
-            need_resize = false;
+            is_resize_requested = false;
+        }
+
+        if is_fullscreen_requested {
+            is_fullscreen = !is_fullscreen;
+            graphicx::set_fullscreen(&window, is_fullscreen);
+            is_fullscreen_requested = false;
         }
 
         // Update and render
