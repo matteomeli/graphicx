@@ -11,9 +11,7 @@ use winapi::um::{d3d12, d3d12sdklayers, d3dcommon, synchapi, winnt};
 use winapi::Interface;
 use wio::com::ComPtr;
 
-use std::ffi::OsString;
 use std::mem;
-use std::os::windows::ffi::OsStringExt;
 use std::ptr;
 use std::time::{Duration, Instant};
 
