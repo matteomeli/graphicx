@@ -11,6 +11,7 @@ use winapi::um::{d3d12, d3d12sdklayers, d3dcommon, synchapi, winnt};
 use winapi::Interface;
 use wio::com::ComPtr;
 
+use std::fmt;
 use std::mem;
 use std::ptr;
 use std::time::{Duration, Instant};
@@ -797,6 +798,7 @@ pub fn set_fullscreen(window: &winit::Window, is_fullscreen: bool) {
     }
 }
 
+#[derive(Debug)]
 pub struct Config {
     pub width: u32,
     pub height: u32,
@@ -832,5 +834,15 @@ impl Config {
             is_vsync_enabled,
             is_fullscreen,
         }
+    }
+}
+
+impl fmt::Display for Config {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "({} {} {} {} {})",
+            self.width, self.height, self.use_warp, self.is_vsync_enabled, self.is_fullscreen
+        )
     }
 }

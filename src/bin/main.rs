@@ -17,11 +17,7 @@ fn main() {
     // Parse command line args into a config
     let args: Vec<String> = env::args().collect();
     let mut config = graphicx::Config::new(&args);
-
-    println!(
-        "Config: {{ width: {}, height: {}, use_warp: {}, is_vsync_enabled: {}, is_fullscreen: {} }}",
-        config.width, config.height, config.use_warp, config.is_vsync_enabled, config.is_fullscreen
-    );
+    println!("{:?}", config);
 
     // Enable debug layer
     graphicx::enable_debug_layer();
