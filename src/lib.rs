@@ -16,7 +16,7 @@ use std::ptr;
 use std::time::{Duration, Instant};
 
 // Add here missing flags for DXGIFactory::MakeWindowsAssociation
-pub const DXGI_MWA_NO_WINDOW_CHANGES: minwindef::UINT = 1 << 0;
+pub const DXGI_MWA_NO_WINDOW_CHANGES: minwindef::UINT = 1;
 pub const DXGI_MWA_NO_ALT_ENTER: minwindef::UINT = 1 << 1;
 pub const DXGI_MWA_NO_PRINT_SCREEN: minwindef::UINT = 1 << 2;
 pub const DXGI_MWA_VALID: minwindef::UINT = 0x7;
@@ -138,7 +138,7 @@ pub fn get_adapter(use_warp: bool) -> ComPtr<dxgi1_6::IDXGIAdapter4> {
     unsafe { ComPtr::from_raw(dxgi_adapter4) }
 }
 
-pub fn create_device(adapter: ComPtr<dxgi1_6::IDXGIAdapter4>) -> ComPtr<d3d12::ID3D12Device2> {
+pub fn create_device(adapter: &ComPtr<dxgi1_6::IDXGIAdapter4>) -> ComPtr<d3d12::ID3D12Device2> {
     let mut d3d12_device2: *mut d3d12::ID3D12Device2 = ptr::null_mut();
     let hr = unsafe {
         d3d12::D3D12CreateDevice(
@@ -221,7 +221,7 @@ pub fn create_device(adapter: ComPtr<dxgi1_6::IDXGIAdapter4>) -> ComPtr<d3d12::I
 }
 
 pub fn create_command_queue(
-    device: ComPtr<d3d12::ID3D12Device2>,
+    device: &ComPtr<d3d12::ID3D12Device2>,
     command_list_type: d3d12::D3D12_COMMAND_LIST_TYPE,
 ) -> ComPtr<d3d12::ID3D12CommandQueue> {
     let mut d3d12_command_queue: *mut d3d12::ID3D12CommandQueue = ptr::null_mut();
@@ -282,11 +282,12 @@ pub fn is_tearing_supported() -> bool {
             }
         }
     }
-    return allow_tearing == minwindef::TRUE;
+
+    allow_tearing == minwindef::TRUE
 }
 
 pub fn create_swap_chain(
-    command_queue: ComPtr<d3d12::ID3D12CommandQueue>,
+    command_queue: &ComPtr<d3d12::ID3D12CommandQueue>,
     hwnd: windef::HWND,
     width: u32,
     height: u32,
@@ -376,7 +377,7 @@ pub fn create_swap_chain(
 }
 
 pub fn create_descriptor_heap(
-    device: ComPtr<d3d12::ID3D12Device2>,
+    device: &ComPtr<d3d12::ID3D12Device2>,
     descriptor_heap_type: d3d12::D3D12_DESCRIPTOR_HEAP_TYPE,
     descriptor_count: usize,
 ) -> ComPtr<d3d12::ID3D12DescriptorHeap> {
@@ -404,9 +405,9 @@ pub fn create_descriptor_heap(
 }
 
 pub fn update_render_target_views(
-    device: ComPtr<d3d12::ID3D12Device2>,
-    swap_chain: ComPtr<dxgi1_5::IDXGISwapChain4>,
-    descriptor_heap: ComPtr<d3d12::ID3D12DescriptorHeap>,
+    device: &ComPtr<d3d12::ID3D12Device2>,
+    swap_chain: &ComPtr<dxgi1_5::IDXGISwapChain4>,
+    descriptor_heap: &ComPtr<d3d12::ID3D12DescriptorHeap>,
     back_buffers_count: usize,
     back_buffers: &mut Vec<ComPtr<d3d12::ID3D12Resource>>,
 ) {
@@ -443,7 +444,7 @@ pub fn update_render_target_views(
 }
 
 pub fn create_command_allocator(
-    device: ComPtr<d3d12::ID3D12Device2>,
+    device: &ComPtr<d3d12::ID3D12Device2>,
     command_list_type: d3d12::D3D12_COMMAND_LIST_TYPE,
 ) -> ComPtr<d3d12::ID3D12CommandAllocator> {
     let mut command_allocator: *mut d3d12::ID3D12CommandAllocator = ptr::null_mut();
@@ -463,8 +464,8 @@ pub fn create_command_allocator(
 }
 
 pub fn create_command_list(
-    device: ComPtr<d3d12::ID3D12Device2>,
-    command_allocator: ComPtr<d3d12::ID3D12CommandAllocator>,
+    device: &ComPtr<d3d12::ID3D12Device2>,
+    command_allocator: &ComPtr<d3d12::ID3D12CommandAllocator>,
     command_list_type: d3d12::D3D12_COMMAND_LIST_TYPE,
 ) -> ComPtr<d3d12::ID3D12GraphicsCommandList> {
     let mut command_list: *mut d3d12::ID3D12GraphicsCommandList = ptr::null_mut();
@@ -491,7 +492,7 @@ pub fn create_command_list(
     unsafe { ComPtr::from_raw(command_list) }
 }
 
-pub fn create_fence(device: ComPtr<d3d12::ID3D12Device2>) -> ComPtr<d3d12::ID3D12Fence> {
+pub fn create_fence(device: &ComPtr<d3d12::ID3D12Device2>) -> ComPtr<d3d12::ID3D12Fence> {
     let mut fence: *mut d3d12::ID3D12Fence = ptr::null_mut();
 
     let hr = unsafe {
@@ -525,8 +526,8 @@ pub fn create_fence_event(manual_reset: bool, initial_state: bool) -> winnt::HAN
 }
 
 pub fn signal_fence_gpu(
-    command_queue: ComPtr<d3d12::ID3D12CommandQueue>,
-    fence: ComPtr<d3d12::ID3D12Fence>,
+    command_queue: &ComPtr<d3d12::ID3D12CommandQueue>,
+    fence: &ComPtr<d3d12::ID3D12Fence>,
     fence_value: &mut u64,
 ) -> u64 {
     *fence_value += 1;
@@ -542,7 +543,7 @@ pub fn signal_fence_gpu(
 }
 
 pub fn wait_for_fence_value(
-    fence: ComPtr<d3d12::ID3D12Fence>,
+    fence: &ComPtr<d3d12::ID3D12Fence>,
     fence_value: u64,
     fence_event: winnt::HANDLE,
 ) {
@@ -550,7 +551,7 @@ pub fn wait_for_fence_value(
 }
 
 pub fn wait_for_fence_value_with_timeout(
-    fence: ComPtr<d3d12::ID3D12Fence>,
+    fence: &ComPtr<d3d12::ID3D12Fence>,
     fence_value: u64,
     fence_event: winnt::HANDLE,
     timeout_ms: u32,
@@ -570,13 +571,13 @@ pub fn wait_for_fence_value_with_timeout(
 }
 
 pub fn flush(
-    command_queue: ComPtr<d3d12::ID3D12CommandQueue>,
-    fence: ComPtr<d3d12::ID3D12Fence>,
+    command_queue: &ComPtr<d3d12::ID3D12CommandQueue>,
+    fence: &ComPtr<d3d12::ID3D12Fence>,
     fence_value: &mut u64,
     fence_event: winnt::HANDLE,
 ) {
-    let fence_value_for_signal = signal_fence_gpu(command_queue, fence.clone(), fence_value);
-    wait_for_fence_value(fence.clone(), fence_value_for_signal, fence_event);
+    let fence_value_for_signal = signal_fence_gpu(command_queue, fence, fence_value);
+    wait_for_fence_value(fence, fence_value_for_signal, fence_event);
 }
 
 pub fn update(frame_counter: &mut u64, elapsed_time_secs: &mut f64, t0: &mut Instant) {
@@ -586,7 +587,7 @@ pub fn update(frame_counter: &mut u64, elapsed_time_secs: &mut f64, t0: &mut Ins
     let delta_time: Duration = t1 - *t0;
     *t0 = t1;
 
-    *elapsed_time_secs += delta_time.as_secs() as f64 + delta_time.subsec_nanos() as f64 * 1e-9;
+    *elapsed_time_secs += delta_time.as_secs() as f64 + f64::from(delta_time.subsec_nanos()) * 1e-9;
     if *elapsed_time_secs > 1.0 {
         let fps = *frame_counter as f64 / *elapsed_time_secs;
         println!("FPS: {}", fps);
@@ -600,12 +601,12 @@ pub fn render(
     command_allocators: &[ComPtr<d3d12::ID3D12CommandAllocator>],
     back_buffers: &[ComPtr<d3d12::ID3D12Resource>],
     current_back_buffer_index: &mut usize,
-    command_list: ComPtr<d3d12::ID3D12GraphicsCommandList>,
-    command_queue: ComPtr<d3d12::ID3D12CommandQueue>,
-    rtv_descriptor_heap: ComPtr<d3d12::ID3D12DescriptorHeap>,
+    command_list: &ComPtr<d3d12::ID3D12GraphicsCommandList>,
+    command_queue: &ComPtr<d3d12::ID3D12CommandQueue>,
+    rtv_descriptor_heap: &ComPtr<d3d12::ID3D12DescriptorHeap>,
     rtv_descriptor_size: usize,
-    swap_chain: ComPtr<dxgi1_5::IDXGISwapChain4>,
-    fence: ComPtr<d3d12::ID3D12Fence>,
+    swap_chain: &ComPtr<dxgi1_5::IDXGISwapChain4>,
+    fence: &ComPtr<d3d12::ID3D12Fence>,
     frame_fence_values: &mut [u64],
     fence_value: &mut u64,
     fence_event: winnt::HANDLE,
@@ -696,13 +697,13 @@ pub fn render(
 
         // Insert a signal into the command queue with a fence value
         frame_fence_values[*current_back_buffer_index] =
-            signal_fence_gpu(command_queue, fence.clone(), fence_value);
+            signal_fence_gpu(&command_queue, &fence, fence_value);
 
         unsafe { *current_back_buffer_index = swap_chain.GetCurrentBackBufferIndex() as _ };
 
         // Stall the CPU until fence value signalled is reached
         wait_for_fence_value(
-            fence.clone(),
+            fence,
             frame_fence_values[*current_back_buffer_index],
             fence_event,
         );
@@ -710,14 +711,14 @@ pub fn render(
 }
 
 pub fn resize(
-    device: ComPtr<d3d12::ID3D12Device2>,
-    command_queue: ComPtr<d3d12::ID3D12CommandQueue>,
+    device: &ComPtr<d3d12::ID3D12Device2>,
+    command_queue: &ComPtr<d3d12::ID3D12CommandQueue>,
     back_buffers: &mut Vec<ComPtr<d3d12::ID3D12Resource>>,
     current_back_buffer_index: &mut usize,
     back_buffers_count: usize,
-    swap_chain: ComPtr<dxgi1_5::IDXGISwapChain4>,
-    descriptor_heap: ComPtr<d3d12::ID3D12DescriptorHeap>,
-    fence: ComPtr<d3d12::ID3D12Fence>,
+    swap_chain: &ComPtr<dxgi1_5::IDXGISwapChain4>,
+    descriptor_heap: &ComPtr<d3d12::ID3D12DescriptorHeap>,
+    fence: &ComPtr<d3d12::ID3D12Fence>,
     frame_fence_values: &mut [u64],
     fence_value: &mut u64,
     fence_event: winnt::HANDLE,

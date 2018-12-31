@@ -26,21 +26,21 @@ fn main() {
     // Create window
     let mut events_loop = EventsLoop::new();
     let window = WindowBuilder::new()
-        .with_dimensions(LogicalSize::new(width as _, height as _))
+        .with_dimensions(LogicalSize::new(f64::from(width), f64::from(height)))
         .with_title("Learning DirectX 12 with Rust")
         .build(&events_loop)
         .unwrap();
     let window_handle: windef::HWND = window.get_hwnd() as *mut _;
 
     let dxgi_adapter = graphicx::get_adapter(use_warp);
-    let device = graphicx::create_device(dxgi_adapter);
+    let device = graphicx::create_device(&dxgi_adapter);
     let command_queue =
-        graphicx::create_command_queue(device.clone(), d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT);
+        graphicx::create_command_queue(&device, d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT);
 
     let back_buffers_count: usize = 3;
     let is_tearing_supported = graphicx::is_tearing_supported();
     let swap_chain = graphicx::create_swap_chain(
-        command_queue.clone(),
+        &command_queue,
         window_handle,
         width,
         height,
@@ -50,7 +50,7 @@ fn main() {
     let mut current_back_buffer_index: usize =
         unsafe { swap_chain.GetCurrentBackBufferIndex() } as _;
     let rtv_descriptor_heap = graphicx::create_descriptor_heap(
-        device.clone(),
+        &device,
         d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
         back_buffers_count,
     );
@@ -61,9 +61,9 @@ fn main() {
     let mut back_buffers: Vec<ComPtr<d3d12::ID3D12Resource>> =
         Vec::with_capacity(back_buffers_count);
     graphicx::update_render_target_views(
-        device.clone(),
-        swap_chain.clone(),
-        rtv_descriptor_heap.clone(),
+        &device,
+        &swap_chain,
+        &rtv_descriptor_heap,
         back_buffers_count,
         &mut back_buffers,
     );
@@ -72,17 +72,17 @@ fn main() {
         Vec::with_capacity(back_buffers_count);
     for _ in 0..back_buffers_count {
         command_allocators.push(graphicx::create_command_allocator(
-            device.clone(),
+            &device,
             d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT,
         ));
     }
     let command_list = graphicx::create_command_list(
-        device.clone(),
-        command_allocators[current_back_buffer_index].clone(),
+        &device,
+        &command_allocators[current_back_buffer_index],
         d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT,
     );
 
-    let fence = graphicx::create_fence(device.clone());
+    let fence = graphicx::create_fence(&device);
     let fence_event = graphicx::create_fence_event(false, false);
     let mut fence_value: u64 = 0;
     let mut frame_fence_values: [u64; 3] = [0, 0, 0];
@@ -162,14 +162,14 @@ fn main() {
         if is_resize_requested {
             println!("Resizing!");
             graphicx::resize(
-                device.clone(),
-                command_queue.clone(),
+                &device,
+                &command_queue,
                 &mut back_buffers,
                 &mut current_back_buffer_index,
                 back_buffers_count,
-                swap_chain.clone(),
-                rtv_descriptor_heap.clone(),
-                fence.clone(),
+                &swap_chain,
+                &rtv_descriptor_heap,
+                &fence,
                 &mut frame_fence_values,
                 &mut fence_value,
                 fence_event,
@@ -193,12 +193,12 @@ fn main() {
             &command_allocators,
             &back_buffers,
             &mut current_back_buffer_index,
-            command_list.clone(),
-            command_queue.clone(),
-            rtv_descriptor_heap.clone(),
+            &command_list,
+            &command_queue,
+            &rtv_descriptor_heap,
             rtv_descriptor_size,
-            swap_chain.clone(),
-            fence.clone(),
+            &swap_chain,
+            &fence,
             &mut frame_fence_values,
             &mut fence_value,
             fence_event,
@@ -208,7 +208,7 @@ fn main() {
     }
 
     println!("Cleanup!");
-    graphicx::flush(command_queue.clone(), fence, &mut fence_value, fence_event);
+    graphicx::flush(&command_queue, &fence, &mut fence_value, fence_event);
     unsafe { handleapi::CloseHandle(fence_event) };
 
     println!("Bye!");
