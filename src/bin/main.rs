@@ -11,14 +11,17 @@ use winit::{
 };
 use wio::com::ComPtr;
 
-fn main() {
-    let mut width: u32 = 1280;
-    let mut height: u32 = 720;
-    let use_warp = false;
-    let mut is_vsync_enabled = false;
-    let mut is_fullscreen = false;
+use std::env;
 
-    // TODO: parse command line args for window width/height and warp mode
+fn main() {
+    // Parse command line args into a config
+    let args: Vec<String> = env::args().collect();
+    let mut config = graphicx::Config::new(&args);
+
+    println!(
+        "Config: {{ width: {}, height: {}, use_warp: {}, is_vsync_enabled: {}, is_fullscreen: {} }}",
+        config.width, config.height, config.use_warp, config.is_vsync_enabled, config.is_fullscreen
+    );
 
     // Enable debug layer
     graphicx::enable_debug_layer();
@@ -26,13 +29,16 @@ fn main() {
     // Create window
     let mut events_loop = EventsLoop::new();
     let window = WindowBuilder::new()
-        .with_dimensions(LogicalSize::new(f64::from(width), f64::from(height)))
+        .with_dimensions(LogicalSize::new(
+            f64::from(config.width),
+            f64::from(config.height),
+        ))
         .with_title("Learning DirectX 12 with Rust")
         .build(&events_loop)
         .unwrap();
     let window_handle: windef::HWND = window.get_hwnd() as *mut _;
 
-    let dxgi_adapter = graphicx::get_adapter(use_warp);
+    let dxgi_adapter = graphicx::get_adapter(config.use_warp);
     let device = graphicx::create_device(&dxgi_adapter);
     let command_queue =
         graphicx::create_command_queue(&device, d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -42,8 +48,8 @@ fn main() {
     let swap_chain = graphicx::create_swap_chain(
         &command_queue,
         window_handle,
-        width,
-        height,
+        config.width,
+        config.height,
         back_buffers_count,
         is_tearing_supported,
     );
@@ -89,9 +95,12 @@ fn main() {
 
     let mut running = true;
     let mut is_resize_requested = false;
-    let mut fullscreen_toggle_requested = false;
-    let mut resize_width: u32 = width;
-    let mut resize_height: u32 = height;
+    let mut is_fullscreen = config.is_fullscreen;
+    if is_fullscreen {
+        graphicx::set_fullscreen(&window, config.is_fullscreen);
+    }
+    let mut resize_width: u32 = config.width;
+    let mut resize_height: u32 = config.height;
 
     let mut frame_counter: u64 = 0;
     let mut elapsed_time_secs = 0.0;
@@ -113,9 +122,9 @@ fn main() {
                     } => {
                         println!(
                             "Received request to toggle vertical sync to {}",
-                            !is_vsync_enabled
+                            !config.is_vsync_enabled
                         );
-                        is_vsync_enabled = !is_vsync_enabled;
+                        config.is_vsync_enabled = !config.is_vsync_enabled;
                     }
                     WindowEvent::KeyboardInput {
                         input:
@@ -128,7 +137,7 @@ fn main() {
                         ..
                     } => {
                         println!("Received request to toggle fullscreen");
-                        fullscreen_toggle_requested = true;
+                        is_fullscreen = !is_fullscreen;
                     }
                     WindowEvent::KeyboardInput {
                         input:
@@ -173,18 +182,17 @@ fn main() {
                 &mut frame_fence_values,
                 &mut fence_value,
                 fence_event,
-                &mut width,
-                &mut height,
+                &mut config.width,
+                &mut config.height,
                 resize_width,
                 resize_height,
             );
             is_resize_requested = false;
         }
 
-        if fullscreen_toggle_requested {
-            is_fullscreen = !is_fullscreen;
-            graphicx::set_fullscreen(&window, is_fullscreen);
-            fullscreen_toggle_requested = false;
+        if config.is_fullscreen != is_fullscreen {
+            config.is_fullscreen = is_fullscreen;
+            graphicx::set_fullscreen(&window, config.is_fullscreen);
         }
 
         // Update and render
@@ -203,7 +211,7 @@ fn main() {
             &mut fence_value,
             fence_event,
             is_tearing_supported,
-            is_vsync_enabled,
+            config.is_vsync_enabled,
         );
     }
 
