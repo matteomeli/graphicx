@@ -1,14 +1,11 @@
 extern crate graphicx;
-extern crate winit;
+
+use graphicx::GameLoop;
 
 use winapi::shared::windef;
 use winapi::um::{d3d12, handleapi};
-use winit::dpi::LogicalSize;
 use winit::os::windows::WindowExt;
-use winit::{
-    ElementState, Event, EventsLoop, KeyboardInput, ModifiersState, VirtualKeyCode, WindowBuilder,
-    WindowEvent,
-};
+
 use wio::com::ComPtr;
 
 use std::env;
@@ -19,29 +16,30 @@ fn main() {
     let mut config = graphicx::Config::new(&args);
     println!("{:?}", config);
 
-    // Enable debug layer
-    graphicx::enable_debug_layer();
-
-    // Create window
-    let mut events_loop = EventsLoop::new();
-    let window = WindowBuilder::new()
-        .with_dimensions(LogicalSize::new(
+    let mut game_loop = GameLoop::new();
+    let mut events_loop = winit::EventsLoop::new();
+    let window = winit::WindowBuilder::new()
+        .with_dimensions(winit::dpi::LogicalSize::new(
             f64::from(config.width),
             f64::from(config.height),
         ))
         .with_title("Learning DirectX 12 with Rust")
         .build(&events_loop)
         .unwrap();
+
     let window_handle: windef::HWND = window.get_hwnd() as *mut _;
 
-    let dxgi_adapter = graphicx::get_adapter(config.use_warp);
-    let device = graphicx::create_device(&dxgi_adapter);
+    // Enable debug layer
+    graphicx::dx12::enable_debug_layer();
+
+    let dxgi_adapter = graphicx::dx12::get_adapter(config.use_warp);
+    let device = graphicx::dx12::create_device(&dxgi_adapter);
     let command_queue =
-        graphicx::create_command_queue(&device, d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT);
+        graphicx::dx12::create_command_queue(&device, d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT);
 
     let back_buffers_count: usize = 3;
-    let is_tearing_supported = graphicx::is_tearing_supported();
-    let swap_chain = graphicx::create_swap_chain(
+    let is_tearing_supported = graphicx::dx12::is_tearing_supported();
+    let swap_chain = graphicx::dx12::create_swap_chain(
         &command_queue,
         window_handle,
         config.width,
@@ -51,7 +49,7 @@ fn main() {
     );
     let mut current_back_buffer_index: usize =
         unsafe { swap_chain.GetCurrentBackBufferIndex() } as _;
-    let rtv_descriptor_heap = graphicx::create_descriptor_heap(
+    let rtv_descriptor_heap = graphicx::dx12::create_descriptor_heap(
         &device,
         d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
         back_buffers_count,
@@ -62,7 +60,7 @@ fn main() {
 
     let mut back_buffers: Vec<ComPtr<d3d12::ID3D12Resource>> =
         Vec::with_capacity(back_buffers_count);
-    graphicx::update_render_target_views(
+    graphicx::dx12::update_render_target_views(
         &device,
         &swap_chain,
         &rtv_descriptor_heap,
@@ -73,45 +71,41 @@ fn main() {
     let mut command_allocators: Vec<ComPtr<d3d12::ID3D12CommandAllocator>> =
         Vec::with_capacity(back_buffers_count);
     for _ in 0..back_buffers_count {
-        command_allocators.push(graphicx::create_command_allocator(
+        command_allocators.push(graphicx::dx12::create_command_allocator(
             &device,
             d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT,
         ));
     }
-    let command_list = graphicx::create_command_list(
+    let command_list = graphicx::dx12::create_command_list(
         &device,
         &command_allocators[current_back_buffer_index],
         d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT,
     );
 
-    let fence = graphicx::create_fence(&device);
-    let fence_event = graphicx::create_fence_event(false, false);
+    let fence = graphicx::dx12::create_fence(&device);
+    let fence_event = graphicx::dx12::create_fence_event(false, false);
     let mut fence_value: u64 = 0;
     let mut frame_fence_values: [u64; 3] = [0, 0, 0];
 
-    let mut running = true;
     let mut is_resize_requested = false;
     let mut is_fullscreen = config.is_fullscreen;
     if is_fullscreen {
-        graphicx::set_fullscreen(&window, config.is_fullscreen);
+        graphicx::window::set_fullscreen(&window, config.is_fullscreen);
     }
-    let mut resize_width: u32 = config.width;
-    let mut resize_height: u32 = config.height;
 
-    let mut frame_counter: u64 = 0;
-    let mut elapsed_time_secs = 0.0;
-    let mut t0 = std::time::Instant::now();
+    let mut is_running = true;
+    while is_running {
+        game_loop.frame();
 
-    while running {
         events_loop.poll_events(|event| {
-            if let Event::WindowEvent { event, .. } = event {
+            if let winit::Event::WindowEvent { event, .. } = event {
                 match event {
-                    WindowEvent::KeyboardInput {
+                    winit::WindowEvent::KeyboardInput {
                         input:
-                            KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::V),
-                                state: ElementState::Released,
-                                modifiers: ModifiersState { alt: true, .. },
+                            winit::KeyboardInput {
+                                virtual_keycode: Some(winit::VirtualKeyCode::V),
+                                state: winit::ElementState::Released,
+                                modifiers: winit::ModifiersState { alt: true, .. },
                                 ..
                             },
                         ..
@@ -122,12 +116,12 @@ fn main() {
                         );
                         config.is_vsync_enabled = !config.is_vsync_enabled;
                     }
-                    WindowEvent::KeyboardInput {
+                    winit::WindowEvent::KeyboardInput {
                         input:
-                            KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::F),
-                                state: ElementState::Released,
-                                modifiers: ModifiersState { alt: true, .. },
+                            winit::KeyboardInput {
+                                virtual_keycode: Some(winit::VirtualKeyCode::F),
+                                state: winit::ElementState::Released,
+                                modifiers: winit::ModifiersState { alt: true, .. },
                                 ..
                             },
                         ..
@@ -135,28 +129,27 @@ fn main() {
                         println!("Received request to toggle fullscreen");
                         is_fullscreen = !is_fullscreen;
                     }
-                    WindowEvent::KeyboardInput {
+                    winit::WindowEvent::KeyboardInput {
                         input:
-                            KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                            winit::KeyboardInput {
+                                virtual_keycode: Some(winit::VirtualKeyCode::Escape),
                                 ..
                             },
                         ..
                     }
-                    | WindowEvent::CloseRequested => {
+                    | winit::WindowEvent::CloseRequested => {
                         println!("Received request to close the window");
-                        running = false;
+                        is_running = false;
                     }
-                    WindowEvent::Resized(LogicalSize { width, height }) => {
+                    winit::WindowEvent::Resized(winit::dpi::LogicalSize { width, height }) => {
                         println!(
                             "Received request to resize the window to {}x{}",
                             width, height
                         );
-                        is_resize_requested =
-                            width as u32 != resize_width || height as u32 != resize_height;
-                        if is_resize_requested {
-                            resize_width = width as _;
-                            resize_height = height as _;
+                        if width as u32 != config.width || height as u32 != config.height {
+                            is_resize_requested = true;
+                            config.width = width as _;
+                            config.height = height as _;
                         }
                     }
                     _ => (),
@@ -164,9 +157,11 @@ fn main() {
             }
         });
 
+        game_loop.update();
+
         if is_resize_requested {
             println!("Resizing!");
-            graphicx::resize(
+            graphicx::dx12::resize(
                 &device,
                 &command_queue,
                 &mut back_buffers,
@@ -178,22 +173,19 @@ fn main() {
                 &mut frame_fence_values,
                 &mut fence_value,
                 fence_event,
-                &mut config.width,
-                &mut config.height,
-                resize_width,
-                resize_height,
+                config.width,
+                config.height,
             );
             is_resize_requested = false;
         }
 
         if config.is_fullscreen != is_fullscreen {
             config.is_fullscreen = is_fullscreen;
-            graphicx::set_fullscreen(&window, config.is_fullscreen);
+            graphicx::window::set_fullscreen(&window, config.is_fullscreen);
         }
 
-        // Update and render
-        graphicx::update(&mut frame_counter, &mut elapsed_time_secs, &mut t0);
-        graphicx::render(
+        // Render
+        graphicx::dx12::render(
             &command_allocators,
             &back_buffers,
             &mut current_back_buffer_index,
@@ -212,7 +204,7 @@ fn main() {
     }
 
     println!("Cleanup!");
-    graphicx::flush(&command_queue, &fence, &mut fence_value, fence_event);
+    graphicx::dx12::flush(&command_queue, &fence, &mut fence_value, fence_event);
     unsafe { handleapi::CloseHandle(fence_event) };
 
     println!("Bye!");
