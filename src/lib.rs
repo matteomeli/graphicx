@@ -779,6 +779,7 @@ pub fn resize(
 }
 
 pub fn set_fullscreen(window: &winit::Window, is_fullscreen: bool) {
+    // Maximise window into full screen borderless window (FSBW) rather than real fullsceen
     if is_fullscreen {
         // Turn off decorations
         window.set_decorations(false);
@@ -786,8 +787,6 @@ pub fn set_fullscreen(window: &winit::Window, is_fullscreen: bool) {
         window.set_always_on_top(true);
         // Maximize window
         window.set_maximized(true);
-    // Sets the window fullscreen
-    //window.set_fullscreen(Some(window.get_current_monitor()));
     } else {
         // Turn off decorations
         window.set_decorations(true);
@@ -795,7 +794,5 @@ pub fn set_fullscreen(window: &winit::Window, is_fullscreen: bool) {
         window.set_always_on_top(false);
         // Maximize window
         window.set_maximized(false);
-        // Sets the window fullscreen
-        //window.set_fullscreen(None);
     }
 }
