@@ -243,7 +243,7 @@ pub fn render(
 
         graphics_command_list.add_barriers(&barrier, 1);
 
-        let clear_color: [f32; 4] = [0.4, 0.6, 0.9, 1.0];
+        let clear_color: [f32; 4] = [0.56, 0.93, 0.56, 1.0];
         let mut rtv = descriptor_heap.get_cpu_descriptor_start();
         rtv.ptr += *current_back_buffer_index * descriptor_size;
 
