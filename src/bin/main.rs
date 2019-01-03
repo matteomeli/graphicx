@@ -1,9 +1,10 @@
 extern crate graphicx;
 
+use graphicx::dx12;
 use graphicx::GameLoop;
 
 use winapi::shared::windef;
-use winapi::um::{d3d12, handleapi};
+use winapi::um::d3d12;
 use winit::os::windows::WindowExt;
 
 use wio::com::ComPtr;
@@ -33,13 +34,18 @@ fn main() {
     graphicx::dx12::enable_debug_layer();
 
     let dxgi_adapter = graphicx::dx12::get_adapter(config.use_warp);
-    let device = graphicx::dx12::create_device(&dxgi_adapter);
-    let command_queue =
-        graphicx::dx12::create_command_queue(&device, d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT);
+    let device = dx12::Device::new(&dxgi_adapter);
+    let command_queue = dx12::CommandQueue::new(
+        &device,
+        dx12::CommandListType::Direct,
+        dx12::CommandQueuePriority::Normal,
+        dx12::CommandQueueFlags::None,
+        0,
+    );
 
     let back_buffers_count: usize = 3;
     let is_tearing_supported = graphicx::dx12::is_tearing_supported();
-    let swap_chain = graphicx::dx12::create_swap_chain(
+    let swap_chain = dx12::SwapChain4::new(
         &command_queue,
         window_handle,
         config.width,
@@ -47,43 +53,43 @@ fn main() {
         back_buffers_count,
         is_tearing_supported,
     );
-    let mut current_back_buffer_index: usize =
-        unsafe { swap_chain.GetCurrentBackBufferIndex() } as _;
-    let rtv_descriptor_heap = graphicx::dx12::create_descriptor_heap(
+    let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _; // TODO: Change to u32
+    let descriptor_heap = dx12::DescriptorHeap::new(
         &device,
-        d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        dx12::DescriptorHeapType::RTV,
+        dx12::DescriptorHeapFlags::None,
         back_buffers_count,
+        0,
     );
-    let rtv_descriptor_size: usize =
-        unsafe { device.GetDescriptorHandleIncrementSize(d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_RTV) }
-            as _;
+    let descriptor_size: usize =
+        device.get_descriptor_increment_size(dx12::DescriptorHeapType::RTV) as _;
 
     let mut back_buffers: Vec<ComPtr<d3d12::ID3D12Resource>> =
         Vec::with_capacity(back_buffers_count);
     graphicx::dx12::update_render_target_views(
         &device,
         &swap_chain,
-        &rtv_descriptor_heap,
+        &descriptor_heap,
         back_buffers_count,
         &mut back_buffers,
     );
 
-    let mut command_allocators: Vec<ComPtr<d3d12::ID3D12CommandAllocator>> =
+    let mut command_allocators: Vec<dx12::CommandAllocator> =
         Vec::with_capacity(back_buffers_count);
     for _ in 0..back_buffers_count {
-        command_allocators.push(graphicx::dx12::create_command_allocator(
+        command_allocators.push(dx12::CommandAllocator::new(
             &device,
-            d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT,
+            dx12::CommandListType::Direct,
         ));
     }
-    let command_list = graphicx::dx12::create_command_list(
+    let graphics_command_list = dx12::GraphicsCommandList::new(
         &device,
         &command_allocators[current_back_buffer_index],
-        d3d12::D3D12_COMMAND_LIST_TYPE_DIRECT,
+        dx12::CommandListType::Direct,
     );
 
-    let fence = graphicx::dx12::create_fence(&device);
-    let fence_event = graphicx::dx12::create_fence_event(false, false);
+    let fence = dx12::Fence::new(&device);
+    let fence_event = dx12::Event::new(false, false);
     let mut fence_value: u64 = 0;
     let mut frame_fence_values: [u64; 3] = [0, 0, 0];
 
@@ -168,11 +174,11 @@ fn main() {
                 &mut current_back_buffer_index,
                 back_buffers_count,
                 &swap_chain,
-                &rtv_descriptor_heap,
+                &descriptor_heap,
                 &fence,
                 &mut frame_fence_values,
-                &mut fence_value,
                 fence_event,
+                &mut fence_value,
                 config.width,
                 config.height,
             );
@@ -189,23 +195,23 @@ fn main() {
             &command_allocators,
             &back_buffers,
             &mut current_back_buffer_index,
-            &command_list,
+            &graphics_command_list,
             &command_queue,
-            &rtv_descriptor_heap,
-            rtv_descriptor_size,
+            &descriptor_heap,
+            descriptor_size,
             &swap_chain,
             &fence,
             &mut frame_fence_values,
-            &mut fence_value,
             fence_event,
+            &mut fence_value,
             is_tearing_supported,
             config.is_vsync_enabled,
         );
     }
 
     println!("Cleanup!");
-    graphicx::dx12::flush(&command_queue, &fence, &mut fence_value, fence_event);
-    unsafe { handleapi::CloseHandle(fence_event) };
+    command_queue.flush(&fence, fence_event, &mut fence_value);
+    fence_event.close();
 
     println!("Bye!");
 }

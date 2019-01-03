@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate bitflags;
 extern crate winit;
 
 pub mod dx12;
@@ -108,5 +110,11 @@ impl GameLoop {
             self.lag_time_secs -= MS_PER_UPDATE;
             update_cyles_count += 1
         }
+    }
+}
+
+impl Default for GameLoop {
+    fn default() -> Self {
+        Self::new()
     }
 }
