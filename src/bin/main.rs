@@ -88,7 +88,7 @@ fn main() {
     let mut is_resize_requested = false;
     let mut is_fullscreen = config.is_fullscreen;
     if is_fullscreen {
-        graphicx::window::set_fullscreen(&window, config.is_fullscreen);
+        graphicx::set_fullscreen(&window, config.is_fullscreen);
     }
 
     let mut frame_counter: u64 = 0;
@@ -216,7 +216,7 @@ fn main() {
 
         if config.is_fullscreen != is_fullscreen {
             config.is_fullscreen = is_fullscreen;
-            graphicx::window::set_fullscreen(&window, config.is_fullscreen);
+            graphicx::set_fullscreen(&window, config.is_fullscreen);
         }
 
         // Render
