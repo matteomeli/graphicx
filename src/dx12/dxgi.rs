@@ -14,6 +14,8 @@ pub const DXGI_MWA_NO_ALT_ENTER: minwindef::UINT = 1 << 1;
 pub const DXGI_MWA_NO_PRINT_SCREEN: minwindef::UINT = 1 << 2;
 pub const DXGI_MWA_VALID: minwindef::UINT = 0x7;
 
+use winit::os::windows::WindowExt;
+
 use std::mem;
 use std::ptr;
 
@@ -24,7 +26,7 @@ pub struct SwapChain4 {
 impl SwapChain4 {
     pub fn new(
         command_queue: &CommandQueue,
-        hwnd: windef::HWND,
+        window: &winit::Window,
         width: u32,
         height: u32,
         back_buffers_count: usize,
@@ -72,6 +74,8 @@ impl SwapChain4 {
 
         let mut dxgi_swap_chain1: *mut dxgi1_2::IDXGISwapChain1 = ptr::null_mut();
         let mut dxgi_swap_chain4: *mut dxgi1_5::IDXGISwapChain4 = ptr::null_mut();
+
+        let hwnd: windef::HWND = window.get_hwnd() as *mut _;
 
         let hr = unsafe {
             (*dxgi_factory4).CreateSwapChainForHwnd(

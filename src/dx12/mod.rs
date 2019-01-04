@@ -6,6 +6,7 @@ pub mod command;
 pub mod descriptor;
 pub mod device;
 pub mod dxgi;
+pub mod resource;
 pub mod sync;
 
 pub use self::command::{
@@ -15,6 +16,7 @@ pub use self::command::{
 pub use self::descriptor::{DescriptorHeap, DescriptorHeapFlags, DescriptorHeapType};
 pub use self::device::Device;
 pub use self::dxgi::SwapChain4;
+pub use self::resource::Resource;
 pub use self::sync::{Event, Fence};
 
 use winapi::shared::{dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, minwindef, winerror};
@@ -180,159 +182,4 @@ pub fn is_tearing_supported() -> bool {
     }
 
     allow_tearing == minwindef::TRUE
-}
-
-pub fn update_render_target_views(
-    device: &Device,
-    swap_chain: &SwapChain4,
-    descriptor_heap: &DescriptorHeap,
-    back_buffers_count: usize, // TODO: Make this u32
-    back_buffers: &mut Vec<ComPtr<d3d12::ID3D12Resource>>,
-) {
-    let descriptor_size: usize = device.get_descriptor_increment_size(DescriptorHeapType::RTV) as _;
-
-    let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
-
-    for i in 0..back_buffers_count {
-        let back_buffer = swap_chain.get_buffer(i as _);
-
-        device.create_render_target_view(&back_buffer, descriptor);
-        back_buffers.push(back_buffer);
-
-        descriptor.ptr += descriptor_size;
-    }
-}
-
-pub fn render(
-    command_allocators: &[CommandAllocator],
-    back_buffers: &[ComPtr<d3d12::ID3D12Resource>],
-    current_back_buffer_index: &mut usize,
-    graphics_command_list: &GraphicsCommandList,
-    command_queue: &CommandQueue,
-    descriptor_heap: &DescriptorHeap,
-    descriptor_size: usize,
-    swap_chain: &SwapChain4,
-    fence: &Fence,
-    frame_fence_values: &mut [u64],
-    fence_event: Event,
-    fence_value: &mut u64,
-    is_tearing_supported: bool,
-    is_vsync_enabled: bool,
-) {
-    let command_allocator = &command_allocators[*current_back_buffer_index];
-    let back_buffer = &back_buffers[*current_back_buffer_index];
-
-    // Reset current command allocator and command list before new commands can be recorded
-    command_allocator.reset();
-    graphics_command_list.reset(&command_allocator);
-
-    // Clear render target
-    {
-        let mut barrier = d3d12::D3D12_RESOURCE_BARRIER {
-            Type: d3d12::D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-            Flags: d3d12::D3D12_RESOURCE_BARRIER_FLAG_NONE,
-            u: unsafe { mem::zeroed() },
-        };
-
-        *unsafe { barrier.u.Transition_mut() } = d3d12::D3D12_RESOURCE_TRANSITION_BARRIER {
-            pResource: back_buffer.as_raw(),
-            Subresource: d3d12::D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-            StateBefore: d3d12::D3D12_RESOURCE_STATE_PRESENT,
-            StateAfter: d3d12::D3D12_RESOURCE_STATE_RENDER_TARGET,
-        };
-
-        graphics_command_list.add_barriers(&barrier, 1);
-
-        let clear_color: [f32; 4] = [0.56, 0.93, 0.56, 1.0];
-        let mut rtv = descriptor_heap.get_cpu_descriptor_start();
-        rtv.ptr += *current_back_buffer_index * descriptor_size;
-
-        graphics_command_list.clear_render_target_view(rtv, clear_color);
-    }
-
-    // Present the back buffer
-    {
-        let mut barrier = d3d12::D3D12_RESOURCE_BARRIER {
-            Type: d3d12::D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-            Flags: d3d12::D3D12_RESOURCE_BARRIER_FLAG_NONE,
-            u: unsafe { mem::zeroed() },
-        };
-
-        *unsafe { barrier.u.Transition_mut() } = d3d12::D3D12_RESOURCE_TRANSITION_BARRIER {
-            pResource: back_buffer.as_raw(),
-            Subresource: d3d12::D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-            StateBefore: d3d12::D3D12_RESOURCE_STATE_RENDER_TARGET,
-            StateAfter: d3d12::D3D12_RESOURCE_STATE_PRESENT,
-        };
-
-        graphics_command_list.add_barriers(&barrier, 1);
-
-        graphics_command_list.close();
-
-        let command_lists = vec![graphics_command_list.as_command_list()];
-        command_queue.execute(&command_lists.as_slice());
-
-        let sync_interval = if is_vsync_enabled { 1 } else { 0 };
-        let present_flags = if is_tearing_supported && !is_vsync_enabled {
-            winapi::shared::dxgi::DXGI_PRESENT_ALLOW_TEARING
-        } else {
-            0
-        };
-        swap_chain.present(sync_interval, present_flags);
-
-        // Insert a signal into the command queue with a fence value
-        frame_fence_values[*current_back_buffer_index] = command_queue.signal(&fence, fence_value);
-
-        *current_back_buffer_index = swap_chain.get_current_back_buffer_index() as _;
-
-        // Stall the CPU until fence value signalled is reached
-        fence.wait_for_value(fence_event, frame_fence_values[*current_back_buffer_index]);
-    }
-}
-
-pub fn resize(
-    device: &Device,
-    command_queue: &CommandQueue,
-    back_buffers: &mut Vec<ComPtr<d3d12::ID3D12Resource>>,
-    current_back_buffer_index: &mut usize,
-    back_buffers_count: usize, // TODO: Make this u32
-    swap_chain: &SwapChain4,
-    descriptor_heap: &DescriptorHeap,
-    fence: &Fence,
-    frame_fence_values: &mut [u64],
-    fence_event: Event,
-    fence_value: &mut u64,
-    width: u32,
-    height: u32,
-) {
-    // Don't allow 0 size swap chain back buffers.
-    let width = 1.max(width);
-    let height = 1.max(height);
-
-    // Flush the GPU queue to make sure the swap chain's back buffers
-    // are not being referenced by an in-flight command list.
-    command_queue.flush(fence, fence_event, fence_value);
-
-    // Any references to the back buffers must be released
-    // before the swap chain can be resized.
-    while let Some(back_buffer) = back_buffers.pop() {
-        std::mem::drop(back_buffer);
-    }
-
-    // Reset per-frame fence values to the fence value of the current back buffer index
-    for i in 0..back_buffers_count {
-        frame_fence_values[i] = frame_fence_values[*current_back_buffer_index];
-    }
-
-    swap_chain.resize_buffers(back_buffers_count as _, width, height);
-
-    *current_back_buffer_index = swap_chain.get_current_back_buffer_index() as _;
-
-    update_render_target_views(
-        device,
-        swap_chain,
-        descriptor_heap,
-        back_buffers_count,
-        back_buffers,
-    );
 }

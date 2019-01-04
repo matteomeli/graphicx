@@ -1,5 +1,6 @@
 use super::command::{CommandAllocator, CommandListType, CommandQueueFlags, CommandQueuePriority};
 use super::descriptor::{CPUDescriptor, DescriptorHeapFlags, DescriptorHeapType};
+use super::resource::Resource;
 
 use winapi::shared::{dxgi1_6, minwindef, winerror};
 use winapi::um::unknwnbase::IUnknown;
@@ -70,9 +71,9 @@ impl Device {
 
                 // Suppress individual messages by their ID
                 let mut deny_ids: Vec<d3d12sdklayers::D3D12_MESSAGE_ID> = vec![
-                    d3d12sdklayers::D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE, // I'm really not sure how to avoid this message.
-                    d3d12sdklayers::D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE, // This warning occurs when using capture frame while graphics debugging.
-                    d3d12sdklayers::D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE, // This warning occurs when using capture frame while graphics debugging.
+                    d3d12sdklayers::D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,
+                    d3d12sdklayers::D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,
+                    d3d12sdklayers::D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,
                 ];
 
                 let mut filter = d3d12sdklayers::D3D12_INFO_QUEUE_FILTER {
@@ -226,14 +227,10 @@ impl Device {
         unsafe { ComPtr::from_raw(graphics_command_list) }
     }
 
-    pub fn create_render_target_view(
-        &self,
-        resource: &ComPtr<d3d12::ID3D12Resource>, // TODO: Wrap this into a struct
-        descriptor: CPUDescriptor,
-    ) {
+    pub fn create_render_target_view(&self, resource: &Resource, descriptor: CPUDescriptor) {
         unsafe {
             self.native
-                .CreateRenderTargetView(resource.as_raw(), ptr::null(), descriptor)
+                .CreateRenderTargetView(resource.as_mut_ptr(), ptr::null(), descriptor)
         };
     }
 
