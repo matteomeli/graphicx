@@ -25,8 +25,8 @@ fn main() {
     // Enable debug layer
     graphicx::dx12::enable_debug_layer();
 
-    let dxgi_adapter = graphicx::dx12::get_adapter(config.use_warp);
-    let device = dx12::Device::new(&dxgi_adapter);
+    let adapter = dx12::Adapter4::new(config.use_warp);
+    let device = dx12::Device::new(&adapter);
     let command_queue = dx12::CommandQueue::new(
         &device,
         dx12::CommandListType::Direct,

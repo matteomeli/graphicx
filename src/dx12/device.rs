@@ -1,8 +1,9 @@
 use super::command::{CommandAllocator, CommandListType, CommandQueueFlags, CommandQueuePriority};
 use super::descriptor::{CPUDescriptor, DescriptorHeapFlags, DescriptorHeapType};
+use super::dxgi::Adapter4;
 use super::resource::Resource;
 
-use winapi::shared::{dxgi1_6, minwindef, winerror};
+use winapi::shared::{minwindef, winerror};
 use winapi::um::unknwnbase::IUnknown;
 use winapi::um::{d3d12, d3d12sdklayers, d3dcommon};
 use winapi::Interface;
@@ -16,11 +17,11 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn new(adapter: &ComPtr<dxgi1_6::IDXGIAdapter4>) -> Self {
+    pub fn new(adapter: &Adapter4) -> Self {
         let mut device: *mut d3d12::ID3D12Device2 = ptr::null_mut();
         let hr = unsafe {
             d3d12::D3D12CreateDevice(
-                adapter.as_raw() as *mut IUnknown,
+                adapter.as_mut_ptr() as *mut IUnknown,
                 d3dcommon::D3D_FEATURE_LEVEL_11_0,
                 &d3d12::ID3D12Device::uuidof(),
                 &mut device as *mut *mut _ as *mut *mut _,

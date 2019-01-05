@@ -1,8 +1,11 @@
 use super::command::CommandQueue;
 
 use winapi::shared::windef::HWND;
-use winapi::shared::{dxgi, dxgi1_2, dxgi1_3, dxgi1_4, dxgi1_5, dxgiformat, dxgitype, winerror};
-use winapi::um::d3d12;
+use winapi::shared::{
+    dxgi, dxgi1_2, dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, dxgiformat, dxgitype, winerror,
+};
+use winapi::um::unknwnbase::IUnknown;
+use winapi::um::{d3d12, d3dcommon};
 use winapi::Interface;
 use wio::com::ComPtr;
 
@@ -107,6 +110,119 @@ pub struct SwapChainDesc {
     pub swap_effect: SwapEffect,
     pub alpha_mode: AlphaMode,
     pub flags: Flags,
+}
+
+pub struct Adapter4 {
+    native: ComPtr<dxgi1_6::IDXGIAdapter4>,
+}
+
+impl Adapter4 {
+    pub fn new(use_warp: bool) -> Self {
+        let mut dxgi_factory: *mut dxgi1_4::IDXGIFactory4 = ptr::null_mut();
+        let flags: u32 = if cfg!(debug_assertions) {
+            dxgi1_3::DXGI_CREATE_FACTORY_DEBUG
+        } else {
+            0
+        };
+
+        let hr = unsafe {
+            dxgi1_3::CreateDXGIFactory2(
+                flags,
+                &dxgi1_4::IDXGIFactory4::uuidof(),
+                &mut dxgi_factory as *mut *mut _ as *mut *mut _,
+            )
+        };
+
+        if !winerror::SUCCEEDED(hr) {
+            panic!("Failed on creating DXGI factory: {:?}", hr);
+        }
+
+        let mut dxgi_adapter1: *mut winapi::shared::dxgi::IDXGIAdapter1 = ptr::null_mut();
+        let mut dxgi_adapter4: *mut dxgi1_6::IDXGIAdapter4 = ptr::null_mut();
+
+        if use_warp {
+            let hr = unsafe {
+                (*dxgi_factory).EnumWarpAdapter(
+                    &winapi::shared::dxgi::IDXGIAdapter1::uuidof(),
+                    &mut dxgi_adapter1 as *mut *mut _ as *mut *mut _,
+                )
+            };
+            if !winerror::SUCCEEDED(hr) {
+                panic!("Failed on enumerating DXGI warp adapter: {:?}", hr);
+            }
+
+            // Perform QueryInterface fun, because we're not using ComPtrs.
+            // TODO: Code repetition, need a function or struct to handle this
+            unsafe {
+                let as_unknown: &IUnknown = &*(dxgi_adapter1 as *mut IUnknown);
+                let err = as_unknown.QueryInterface(
+                    &dxgi1_6::IDXGIAdapter4::uuidof(),
+                    &mut dxgi_adapter4 as *mut *mut _ as *mut *mut _,
+                );
+                if err < 0 {
+                    panic!("Failed on casting DXGI warp adapter: {:?}", hr);
+                }
+            }
+        } else {
+            let mut index = 0;
+            let mut max_dedicated_vdeo_memory = 0;
+            loop {
+                let hr = unsafe { (*dxgi_factory).EnumAdapters1(index, &mut dxgi_adapter1) };
+                if hr == winerror::DXGI_ERROR_NOT_FOUND {
+                    break;
+                }
+
+                index += 1;
+
+                let mut desc: winapi::shared::dxgi::DXGI_ADAPTER_DESC1 = unsafe { mem::zeroed() };
+                let hr = unsafe { (*dxgi_adapter1).GetDesc1(&mut desc) };
+                if !winerror::SUCCEEDED(hr) {
+                    panic!("Failed on obtaining DXGI adapter description: {:?}", hr);
+                }
+
+                // We want only the hardware adapter with the largest dedicated video memory
+                let hr = unsafe {
+                    d3d12::D3D12CreateDevice(
+                        dxgi_adapter1 as *mut _,
+                        d3dcommon::D3D_FEATURE_LEVEL_11_0,
+                        &d3d12::ID3D12Device::uuidof(),
+                        ptr::null_mut(),
+                    )
+                };
+                if (desc.Flags & winapi::shared::dxgi::DXGI_ADAPTER_FLAG_SOFTWARE) == 0
+                    && desc.DedicatedVideoMemory > max_dedicated_vdeo_memory
+                    && winerror::SUCCEEDED(hr)
+                {
+                    max_dedicated_vdeo_memory = desc.DedicatedVideoMemory;
+
+                    // Perform QueryInterface fun, because we're not using ComPtrs.
+                    // TODO: Code repetition, need a function or struct to handle this
+                    unsafe {
+                        let as_unknown: &IUnknown = &*(dxgi_adapter1 as *mut IUnknown);
+                        let err = as_unknown.QueryInterface(
+                            &dxgi1_6::IDXGIAdapter4::uuidof(),
+                            &mut dxgi_adapter4 as *mut *mut _ as *mut *mut _,
+                        );
+                        if err < 0 {
+                            panic!("Failed on casting into a DXGI 1.5 adapter: {:?}", hr);
+                        }
+                    }
+                }
+            }
+        }
+
+        Adapter4 {
+            native: unsafe { ComPtr::from_raw(dxgi_adapter4) },
+        }
+    }
+
+    pub fn as_ptr(&self) -> *const dxgi1_6::IDXGIAdapter4 {
+        self.native.as_raw()
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut dxgi1_6::IDXGIAdapter4 {
+        self.native.as_raw()
+    }
 }
 
 pub struct Factory2 {
