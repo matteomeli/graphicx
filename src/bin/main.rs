@@ -1,10 +1,8 @@
 extern crate graphicx;
 
 use graphicx::dx12;
-use winapi::um::d3d12;
 
 use std::env;
-use std::mem;
 
 fn main() {
     // Parse command line args into a config
@@ -45,7 +43,7 @@ fn main() {
         back_buffers_count,
         is_tearing_supported,
     );
-    let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _; // TODO: Change to u32
+    let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _;
     let descriptor_heap = dx12::DescriptorHeap::new(
         &device,
         dx12::DescriptorHeapType::RTV,
@@ -221,29 +219,18 @@ fn main() {
 
         // Render
         {
-            let command_allocator = &command_allocators[current_back_buffer_index];
-            let back_buffer = &back_buffers[current_back_buffer_index];
-
             // Reset current command allocator and command list before new commands can be recorded
+            let command_allocator = &command_allocators[current_back_buffer_index];
             command_allocator.reset();
             graphics_command_list.reset(&command_allocator);
 
             // Clear render target
             {
-                let mut barrier = d3d12::D3D12_RESOURCE_BARRIER {
-                    Type: d3d12::D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-                    Flags: d3d12::D3D12_RESOURCE_BARRIER_FLAG_NONE,
-                    u: unsafe { mem::zeroed() },
-                };
-
-                *unsafe { barrier.u.Transition_mut() } = d3d12::D3D12_RESOURCE_TRANSITION_BARRIER {
-                    pResource: back_buffer.as_mut_ptr(),
-                    Subresource: d3d12::D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                    StateBefore: d3d12::D3D12_RESOURCE_STATE_PRESENT,
-                    StateAfter: d3d12::D3D12_RESOURCE_STATE_RENDER_TARGET,
-                };
-
-                graphics_command_list.add_barriers(&barrier, 1);
+                let barriers = vec![dx12::BarrierDesc::new(
+                    current_back_buffer_index,
+                    dx12::ResourceStates::Present..dx12::ResourceStates::RenderTarget,
+                )];
+                graphics_command_list.insert_transition_barriers(&barriers, &back_buffers);
 
                 let clear_color: [f32; 4] = [0.56, 0.93, 0.56, 1.0];
                 let mut rtv = descriptor_heap.get_cpu_descriptor_start();
@@ -254,20 +241,12 @@ fn main() {
 
             // Present the back buffer
             {
-                let mut barrier = d3d12::D3D12_RESOURCE_BARRIER {
-                    Type: d3d12::D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-                    Flags: d3d12::D3D12_RESOURCE_BARRIER_FLAG_NONE,
-                    u: unsafe { mem::zeroed() },
-                };
+                let barriers = vec![dx12::BarrierDesc::new(
+                    current_back_buffer_index,
+                    dx12::ResourceStates::RenderTarget..dx12::ResourceStates::Present,
+                )];
+                graphics_command_list.insert_transition_barriers(&barriers, &back_buffers);
 
-                *unsafe { barrier.u.Transition_mut() } = d3d12::D3D12_RESOURCE_TRANSITION_BARRIER {
-                    pResource: back_buffer.as_mut_ptr(),
-                    Subresource: d3d12::D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                    StateBefore: d3d12::D3D12_RESOURCE_STATE_RENDER_TARGET,
-                    StateAfter: d3d12::D3D12_RESOURCE_STATE_PRESENT,
-                };
-
-                graphics_command_list.add_barriers(&barrier, 1);
                 graphics_command_list.close();
 
                 let command_lists = vec![graphics_command_list.as_command_list()];

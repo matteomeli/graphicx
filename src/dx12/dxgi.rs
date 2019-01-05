@@ -19,6 +19,9 @@ use winit::os::windows::WindowExt;
 use std::mem;
 use std::ptr;
 
+// TODO: Factory wrap
+// TODO: Adapter wrap
+
 pub struct SwapChain4 {
     native: ComPtr<dxgi1_5::IDXGISwapChain4>,
 }

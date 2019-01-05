@@ -1,11 +1,14 @@
+use super::barrier::BarrierDesc;
 use super::descriptor::CPUDescriptor;
 use super::device::Device;
+use super::resource::Resource;
 use super::sync::{Event, Fence};
 
 use winapi::shared::winerror;
 use winapi::um::d3d12;
 use wio::com::ComPtr;
 
+use std::mem;
 use std::ptr;
 
 #[repr(u32)]
@@ -106,8 +109,34 @@ impl GraphicsCommandList {
         }
     }
 
-    pub fn add_barriers(&self, barrier: &d3d12::D3D12_RESOURCE_BARRIER, barriers_count: usize) {
-        unsafe { self.native.ResourceBarrier(barriers_count as _, barrier) };
+    pub fn insert_transition_barriers(&self, barriers: &[BarrierDesc], resources: &[Resource]) {
+        let transition_barriers = barriers
+            .iter()
+            .map(|barrier| {
+                let mut resource_barrier = d3d12::D3D12_RESOURCE_BARRIER {
+                    Type: d3d12::D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                    Flags: barrier.flags.bits(),
+                    u: unsafe { mem::zeroed() },
+                };
+
+                *unsafe { resource_barrier.u.Transition_mut() } =
+                    d3d12::D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: resources[barrier.index].as_mut_ptr(),
+                        Subresource: d3d12::D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                        StateBefore: barrier.states.start.bits(),
+                        StateAfter: barrier.states.end.bits(),
+                    };
+
+                resource_barrier
+            })
+            .collect::<Vec<_>>();
+
+        if !transition_barriers.is_empty() {
+            unsafe {
+                self.native
+                    .ResourceBarrier(transition_barriers.len() as _, transition_barriers.as_ptr())
+            };
+        }
     }
 
     pub fn clear_render_target_view(&self, rtv: CPUDescriptor, clear_color: [f32; 4]) {

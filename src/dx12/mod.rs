@@ -2,6 +2,7 @@ extern crate winapi;
 extern crate winit;
 extern crate wio;
 
+pub mod barrier;
 pub mod command;
 pub mod descriptor;
 pub mod device;
@@ -9,6 +10,7 @@ pub mod dxgi;
 pub mod resource;
 pub mod sync;
 
+pub use self::barrier::{BarrierDesc, BarrierFlags};
 pub use self::command::{
     CommandAllocator, CommandListType, CommandQueue, CommandQueueFlags, CommandQueuePriority,
     GraphicsCommandList,
@@ -16,7 +18,7 @@ pub use self::command::{
 pub use self::descriptor::{DescriptorHeap, DescriptorHeapFlags, DescriptorHeapType};
 pub use self::device::Device;
 pub use self::dxgi::SwapChain4;
-pub use self::resource::Resource;
+pub use self::resource::{Resource, ResourceStates};
 pub use self::sync::{Event, Fence};
 
 use winapi::shared::{dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, minwindef, winerror};
