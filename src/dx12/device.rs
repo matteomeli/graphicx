@@ -122,13 +122,13 @@ impl Device {
         &self,
         descriptor_type: DescriptorHeapType,
         descriptor_flags: DescriptorHeapFlags,
-        descriptor_count: usize,
+        descriptor_count: u32,
         node_mask: u32,
     ) -> ComPtr<d3d12::ID3D12DescriptorHeap> {
         let mut descriptor_heap: *mut d3d12::ID3D12DescriptorHeap = ptr::null_mut();
 
         let desc = d3d12::D3D12_DESCRIPTOR_HEAP_DESC {
-            NumDescriptors: descriptor_count as _,
+            NumDescriptors: descriptor_count,
             Type: descriptor_type as _,
             Flags: descriptor_flags.bits() as _,
             NodeMask: node_mask,

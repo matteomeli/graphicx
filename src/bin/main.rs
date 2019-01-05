@@ -2,6 +2,8 @@ extern crate graphicx;
 
 use graphicx::dx12;
 
+use winit::os::windows::WindowExt;
+
 use std::env;
 
 fn main() {
@@ -33,29 +35,49 @@ fn main() {
         0,
     );
 
-    let back_buffers_count: usize = 3;
-    let is_tearing_supported = graphicx::dx12::is_tearing_supported();
-    let swap_chain = dx12::SwapChain4::new(
-        &command_queue,
-        &window,
-        config.width,
-        config.height,
-        back_buffers_count,
-        is_tearing_supported,
-    );
+    let buffers_count: u32 = 3;
+    let is_tearing_supported = dx12::is_tearing_supported();
+    let factory = dx12::Factory4::new(if cfg!(debug_assertions) {
+        dx12::FactoryCreationFlags::Debug
+    } else {
+        dx12::FactoryCreationFlags::None
+    });
+    let hwnd = window.get_hwnd() as *mut _;
+    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NoAltEnter);
+    let swap_chain_desc = dx12::SwapChainDesc {
+        width: config.width,
+        height: config.height,
+        format: dx12::Format::R8G8B8A8_UNORM,
+        stereo: false,
+        sample_desc: dx12::SampleDesc {
+            count: 1,
+            quality: 0,
+        },
+        buffer_usage: dx12::Usage::RenderTargetOutput,
+        buffer_count: buffers_count,
+        scaling: dx12::Scaling::Stretch,
+        swap_effect: dx12::SwapEffect::FlipDiscard,
+        alpha_mode: dx12::AlphaMode::Unspecified,
+        flags: if is_tearing_supported {
+            dx12::Flags::AllowTearing
+        } else {
+            dx12::Flags::None
+        },
+    };
+    let swap_chain = dx12::SwapChain4::new(&factory, &command_queue, &swap_chain_desc, hwnd);
     let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _;
     let descriptor_heap = dx12::DescriptorHeap::new(
         &device,
         dx12::DescriptorHeapType::RTV,
         dx12::DescriptorHeapFlags::None,
-        back_buffers_count,
+        buffers_count,
         0,
     );
     let descriptor_size: usize =
         device.get_descriptor_increment_size(dx12::DescriptorHeapType::RTV) as _;
     let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
-    let mut back_buffers: Vec<dx12::Resource> = Vec::with_capacity(back_buffers_count);
-    for i in 0..back_buffers_count {
+    let mut back_buffers: Vec<dx12::Resource> = Vec::with_capacity(buffers_count as _);
+    for i in 0..buffers_count {
         let back_buffer = dx12::Resource::new(&swap_chain, i as u32);
 
         device.create_render_target_view(&back_buffer, descriptor);
@@ -65,8 +87,8 @@ fn main() {
     }
 
     let mut command_allocators: Vec<dx12::CommandAllocator> =
-        Vec::with_capacity(back_buffers_count);
-    for _ in 0..back_buffers_count {
+        Vec::with_capacity(buffers_count as _);
+    for _ in 0..buffers_count {
         command_allocators.push(dx12::CommandAllocator::new(
             &device,
             dx12::CommandListType::Direct,
@@ -190,17 +212,17 @@ fn main() {
             }
 
             // Reset per-frame fence values to the fence value of the current back buffer index
-            for i in 0..back_buffers_count {
+            for i in 0..buffers_count as _ {
                 frame_fence_values[i] = frame_fence_values[current_back_buffer_index];
             }
 
-            swap_chain.resize_buffers(back_buffers_count as _, width, height);
+            swap_chain.resize_buffers(buffers_count as _, width, height);
 
             current_back_buffer_index = swap_chain.get_current_back_buffer_index() as _;
 
             let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
 
-            for i in 0..back_buffers_count {
+            for i in 0..buffers_count {
                 let back_buffer = dx12::Resource::new(&swap_chain, i as u32);
 
                 device.create_render_target_view(&back_buffer, descriptor);

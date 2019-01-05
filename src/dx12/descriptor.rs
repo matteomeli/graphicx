@@ -26,7 +26,7 @@ impl DescriptorHeap {
         device: &Device,
         descriptor_type: DescriptorHeapType,
         descriptor_flags: DescriptorHeapFlags,
-        descriptor_count: usize,
+        descriptor_count: u32,
         node_mask: u32,
     ) -> Self {
         DescriptorHeap {
