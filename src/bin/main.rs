@@ -250,7 +250,7 @@ fn main() {
                 graphics_command_list.close();
 
                 let command_lists = vec![graphics_command_list.as_command_list()];
-                command_queue.execute(&command_lists.as_slice());
+                command_queue.execute(&command_lists);
 
                 let sync_interval = if config.is_vsync_enabled { 1 } else { 0 };
                 let present_flags = if is_tearing_supported && !config.is_vsync_enabled {
