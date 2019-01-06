@@ -117,7 +117,7 @@ pub struct SwapChainDesc {
 }
 
 pub struct Factory1 {
-    pub raw: ComPtr<dxgi::IDXGIFactory1>,
+    raw: ComPtr<dxgi::IDXGIFactory1>,
 }
 
 impl Factory1 {
@@ -194,7 +194,7 @@ impl Factory2 {
 }
 
 pub struct Factory4 {
-    pub raw: ComPtr<dxgi1_4::IDXGIFactory4>,
+    raw: ComPtr<dxgi1_4::IDXGIFactory4>,
 }
 
 impl Factory4 {
