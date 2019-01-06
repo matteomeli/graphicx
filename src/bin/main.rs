@@ -1,6 +1,3 @@
-extern crate graphicx;
-extern crate winit;
-
 use graphicx::dx12;
 
 use winit::os::windows::WindowExt;
