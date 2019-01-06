@@ -272,9 +272,9 @@ fn main() {
 
                 let sync_interval = if config.is_vsync_enabled { 1 } else { 0 };
                 let present_flags = if is_tearing_supported && !config.is_vsync_enabled {
-                    winapi::shared::dxgi::DXGI_PRESENT_ALLOW_TEARING
+                    dx12::PresentFlags::AllowTearing
                 } else {
-                    0
+                    dx12::PresentFlags::None
                 };
                 swap_chain.present(sync_interval, present_flags);
 

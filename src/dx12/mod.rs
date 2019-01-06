@@ -18,8 +18,8 @@ pub use self::command::{
 pub use self::descriptor::{DescriptorHeap, DescriptorHeapFlags, DescriptorHeapType};
 pub use self::device::Device;
 pub use self::dxgi::{
-    Adapter4, AlphaMode, Factory4, FactoryCreationFlags, Flags, Format, SampleDesc, Scaling,
-    SwapChain1, SwapChain4, SwapChainDesc, SwapEffect, Usage, WindowAssociationFlags,
+    Adapter4, AlphaMode, Factory4, FactoryCreationFlags, Flags, Format, PresentFlags, SampleDesc,
+    Scaling, SwapChain1, SwapChain4, SwapChainDesc, SwapEffect, Usage, WindowAssociationFlags,
 };
 pub use self::resource::{Resource, ResourceStates};
 pub use self::sync::{Event, Fence};

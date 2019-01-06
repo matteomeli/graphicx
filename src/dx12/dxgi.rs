@@ -85,6 +85,21 @@ pub enum DxgiFeature {
 }
 
 bitflags! {
+    pub struct PresentFlags: u32 {
+        const None = 0;
+        const DoNotSequence = dxgi::DXGI_PRESENT_DO_NOT_SEQUENCE;
+        const Test = dxgi::DXGI_PRESENT_TEST;
+        const Restart = dxgi::DXGI_PRESENT_RESTART;
+        const DoNotWait = dxgi::DXGI_PRESENT_DO_NOT_WAIT;
+        const RestrictToOutput = dxgi::DXGI_PRESENT_RESTRICT_TO_OUTPUT;
+        const PreferRight = dxgi::DXGI_PRESENT_STEREO_PREFER_RIGHT;
+        const StereoTemporaryMono = dxgi::DXGI_PRESENT_STEREO_TEMPORARY_MONO;
+        const UseDuration = dxgi::DXGI_PRESENT_USE_DURATION;
+        const AllowTearing = dxgi::DXGI_PRESENT_ALLOW_TEARING;
+    }
+}
+
+bitflags! {
     pub struct Flags: u32 {
         const None = 0;
         const NonPrerotated = dxgi::DXGI_SWAP_CHAIN_FLAG_NONPREROTATED;
@@ -428,8 +443,8 @@ impl SwapChain {
         }
     }
 
-    pub fn present(&self, sync_interval: u32, flags: u32) {
-        let hr = unsafe { self.raw.Present(sync_interval, flags) };
+    pub fn present(&self, sync_interval: u32, flags: PresentFlags) {
+        let hr = unsafe { self.raw.Present(sync_interval, flags.bits()) };
         if !winerror::SUCCEEDED(hr) {
             panic!(
                 "Failed on presenting the swap chain's current back buffer: {:?}",
@@ -531,7 +546,7 @@ impl SwapChain4 {
             .resize_buffers(buffers_count, width, height);
     }
 
-    pub fn present(&self, sync_interval: u32, flags: u32) {
+    pub fn present(&self, sync_interval: u32, flags: PresentFlags) {
         self.as_swap_chain().present(sync_interval, flags);
     }
 }
