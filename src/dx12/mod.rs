@@ -4,6 +4,7 @@ extern crate wio;
 
 pub mod barrier;
 pub mod command;
+pub mod debug;
 pub mod descriptor;
 pub mod device;
 pub mod dxgi;
@@ -15,6 +16,7 @@ pub use self::command::{
     CommandAllocator, CommandListType, CommandQueue, CommandQueueFlags, CommandQueuePriority,
     GraphicsCommandList,
 };
+pub use self::debug::Debug;
 pub use self::descriptor::{DescriptorHeap, DescriptorHeapFlags, DescriptorHeapType};
 pub use self::device::Device;
 pub use self::dxgi::{
@@ -23,29 +25,3 @@ pub use self::dxgi::{
 };
 pub use self::resource::{Resource, ResourceStates};
 pub use self::sync::{Event, Fence};
-
-use winapi::shared::winerror;
-use winapi::um::{d3d12, d3d12sdklayers};
-use winapi::Interface;
-
-use std::ptr;
-
-#[cfg(debug_assertions)]
-pub fn enable_debug_layer() {
-    let mut debug_interface: *mut d3d12sdklayers::ID3D12Debug = ptr::null_mut();
-    let hr = unsafe {
-        d3d12::D3D12GetDebugInterface(
-            &d3d12sdklayers::ID3D12Debug::uuidof(),
-            &mut debug_interface as *mut *mut _ as *mut *mut _,
-        )
-    };
-
-    if winerror::SUCCEEDED(hr) {
-        unsafe {
-            (*debug_interface).EnableDebugLayer();
-            (*debug_interface).Release();
-        }
-    }
-}
-#[cfg(not(debug_assertions))]
-pub fn enable_debug_layer() {}

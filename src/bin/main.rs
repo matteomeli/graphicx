@@ -1,3 +1,5 @@
+extern crate graphicx;
+
 use graphicx::dx12;
 
 use winit::os::windows::WindowExt;
@@ -21,7 +23,10 @@ fn main() {
         .unwrap();
 
     // Enable debug layer
-    graphicx::dx12::enable_debug_layer();
+    if cfg!(debug_assertions) {
+        let debug_interface = dx12::Debug::get_interface();
+        debug_interface.enable_layer();
+    }
 
     let hwnd = window.get_hwnd() as *mut _;
     let factory = dx12::Factory4::create(if cfg!(debug_assertions) {
