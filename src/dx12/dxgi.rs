@@ -1,15 +1,18 @@
 use super::command::CommandQueue;
+use super::resource::Resource;
 
 use winapi::shared::windef::HWND;
 use winapi::shared::{
-    dxgi, dxgi1_2, dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, dxgiformat, dxgitype, winerror,
+    dxgi, dxgi1_2, dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, dxgiformat, dxgitype, minwindef, winerror,
 };
 use winapi::um::unknwnbase::IUnknown;
 use winapi::um::{d3d12, d3dcommon};
 use winapi::Interface;
 use wio::com::ComPtr;
 
-// Add here missing flags for DXGIFactory::MakeWindowsAssociation
+use std::mem;
+use std::ptr;
+
 bitflags! {
     pub struct WindowAssociationFlags: u32 {
         const NoWindowChanges = 1;
@@ -18,11 +21,6 @@ bitflags! {
         const Valid = 0x7;
     }
 }
-
-use std::mem;
-use std::ptr;
-
-// TODO: Adapter wrap
 
 bitflags! {
     pub struct FactoryCreationFlags: u32 {
@@ -80,6 +78,12 @@ pub enum AlphaMode {
     ForceDword = dxgi1_2::DXGI_ALPHA_MODE_FORCE_DWORD,
 }
 
+#[repr(u32)]
+#[derive(Copy, Clone)]
+pub enum DxgiFeature {
+    AllowTearing = dxgi1_5::DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+}
+
 bitflags! {
     pub struct Flags: u32 {
         const None = 0;
@@ -112,121 +116,26 @@ pub struct SwapChainDesc {
     pub flags: Flags,
 }
 
-pub struct Adapter4 {
-    native: ComPtr<dxgi1_6::IDXGIAdapter4>,
+pub struct Factory1 {
+    pub raw: ComPtr<dxgi::IDXGIFactory1>,
 }
 
-impl Adapter4 {
-    pub fn new(use_warp: bool) -> Self {
-        let mut dxgi_factory: *mut dxgi1_4::IDXGIFactory4 = ptr::null_mut();
-        let flags: u32 = if cfg!(debug_assertions) {
-            dxgi1_3::DXGI_CREATE_FACTORY_DEBUG
+impl Factory1 {
+    pub fn enumerate_adapters(&self, index: u32) -> Option<Adapter1> {
+        let mut adapter: *mut dxgi::IDXGIAdapter1 = ptr::null_mut();
+        let hr = unsafe { self.raw.EnumAdapters1(index, &mut adapter) };
+        if hr != winerror::DXGI_ERROR_NOT_FOUND {
+            Some(Adapter1 {
+                raw: unsafe { ComPtr::from_raw(adapter) },
+            })
         } else {
-            0
-        };
-
-        let hr = unsafe {
-            dxgi1_3::CreateDXGIFactory2(
-                flags,
-                &dxgi1_4::IDXGIFactory4::uuidof(),
-                &mut dxgi_factory as *mut *mut _ as *mut *mut _,
-            )
-        };
-
-        if !winerror::SUCCEEDED(hr) {
-            panic!("Failed on creating DXGI factory: {:?}", hr);
+            None
         }
-
-        let mut dxgi_adapter1: *mut winapi::shared::dxgi::IDXGIAdapter1 = ptr::null_mut();
-        let mut dxgi_adapter4: *mut dxgi1_6::IDXGIAdapter4 = ptr::null_mut();
-
-        if use_warp {
-            let hr = unsafe {
-                (*dxgi_factory).EnumWarpAdapter(
-                    &winapi::shared::dxgi::IDXGIAdapter1::uuidof(),
-                    &mut dxgi_adapter1 as *mut *mut _ as *mut *mut _,
-                )
-            };
-            if !winerror::SUCCEEDED(hr) {
-                panic!("Failed on enumerating DXGI warp adapter: {:?}", hr);
-            }
-
-            // Perform QueryInterface fun, because we're not using ComPtrs.
-            // TODO: Code repetition, need a function or struct to handle this
-            unsafe {
-                let as_unknown: &IUnknown = &*(dxgi_adapter1 as *mut IUnknown);
-                let err = as_unknown.QueryInterface(
-                    &dxgi1_6::IDXGIAdapter4::uuidof(),
-                    &mut dxgi_adapter4 as *mut *mut _ as *mut *mut _,
-                );
-                if err < 0 {
-                    panic!("Failed on casting DXGI warp adapter: {:?}", hr);
-                }
-            }
-        } else {
-            let mut index = 0;
-            let mut max_dedicated_vdeo_memory = 0;
-            loop {
-                let hr = unsafe { (*dxgi_factory).EnumAdapters1(index, &mut dxgi_adapter1) };
-                if hr == winerror::DXGI_ERROR_NOT_FOUND {
-                    break;
-                }
-
-                index += 1;
-
-                let mut desc: winapi::shared::dxgi::DXGI_ADAPTER_DESC1 = unsafe { mem::zeroed() };
-                let hr = unsafe { (*dxgi_adapter1).GetDesc1(&mut desc) };
-                if !winerror::SUCCEEDED(hr) {
-                    panic!("Failed on obtaining DXGI adapter description: {:?}", hr);
-                }
-
-                // We want only the hardware adapter with the largest dedicated video memory
-                let hr = unsafe {
-                    d3d12::D3D12CreateDevice(
-                        dxgi_adapter1 as *mut _,
-                        d3dcommon::D3D_FEATURE_LEVEL_11_0,
-                        &d3d12::ID3D12Device::uuidof(),
-                        ptr::null_mut(),
-                    )
-                };
-                if (desc.Flags & winapi::shared::dxgi::DXGI_ADAPTER_FLAG_SOFTWARE) == 0
-                    && desc.DedicatedVideoMemory > max_dedicated_vdeo_memory
-                    && winerror::SUCCEEDED(hr)
-                {
-                    max_dedicated_vdeo_memory = desc.DedicatedVideoMemory;
-
-                    // Perform QueryInterface fun, because we're not using ComPtrs.
-                    // TODO: Code repetition, need a function or struct to handle this
-                    unsafe {
-                        let as_unknown: &IUnknown = &*(dxgi_adapter1 as *mut IUnknown);
-                        let err = as_unknown.QueryInterface(
-                            &dxgi1_6::IDXGIAdapter4::uuidof(),
-                            &mut dxgi_adapter4 as *mut *mut _ as *mut *mut _,
-                        );
-                        if err < 0 {
-                            panic!("Failed on casting into a DXGI 1.5 adapter: {:?}", hr);
-                        }
-                    }
-                }
-            }
-        }
-
-        Adapter4 {
-            native: unsafe { ComPtr::from_raw(dxgi_adapter4) },
-        }
-    }
-
-    pub fn as_ptr(&self) -> *const dxgi1_6::IDXGIAdapter4 {
-        self.native.as_raw()
-    }
-
-    pub fn as_mut_ptr(&self) -> *mut dxgi1_6::IDXGIAdapter4 {
-        self.native.as_raw()
     }
 }
 
 pub struct Factory2 {
-    native: ComPtr<dxgi1_2::IDXGIFactory2>,
+    raw: ComPtr<dxgi1_2::IDXGIFactory2>,
 }
 
 impl Factory2 {
@@ -235,7 +144,7 @@ impl Factory2 {
         command_queue: &CommandQueue,
         desc: &SwapChainDesc,
         hwnd: HWND,
-    ) -> *mut dxgi1_2::IDXGISwapChain1 {
+    ) -> SwapChain1 {
         let desc = dxgi1_2::DXGI_SWAP_CHAIN_DESC1 {
             Width: desc.width,
             Height: desc.height,
@@ -255,7 +164,7 @@ impl Factory2 {
 
         let mut swap_chain: *mut dxgi1_2::IDXGISwapChain1 = ptr::null_mut();
         let hr = unsafe {
-            self.native.CreateSwapChainForHwnd(
+            self.raw.CreateSwapChainForHwnd(
                 command_queue.as_mut_ptr() as *mut _,
                 hwnd,
                 &desc,
@@ -268,11 +177,13 @@ impl Factory2 {
             panic!("Failed on creating a swap chain: {:?}", hr);
         }
 
-        swap_chain
+        SwapChain1 {
+            raw: unsafe { ComPtr::from_raw(swap_chain) },
+        }
     }
 
     pub fn make_window_association(&self, hwnd: HWND, flags: WindowAssociationFlags) {
-        let hr = unsafe { self.native.MakeWindowAssociation(hwnd, flags.bits()) };
+        let hr = unsafe { self.raw.MakeWindowAssociation(hwnd, flags.bits()) };
         if !winerror::SUCCEEDED(hr) {
             panic!(
                 "Failed on disabling ALT-ENTER as fullscreen toggle: {:?}",
@@ -283,11 +194,11 @@ impl Factory2 {
 }
 
 pub struct Factory4 {
-    native: ComPtr<dxgi1_4::IDXGIFactory4>,
+    pub raw: ComPtr<dxgi1_4::IDXGIFactory4>,
 }
 
 impl Factory4 {
-    pub fn new(flags: FactoryCreationFlags) -> Self {
+    pub fn create(flags: FactoryCreationFlags) -> Self {
         let mut factory: *mut dxgi1_4::IDXGIFactory4 = ptr::null_mut();
         let hr = unsafe {
             dxgi1_3::CreateDXGIFactory2(
@@ -301,22 +212,94 @@ impl Factory4 {
         }
 
         Factory4 {
-            native: unsafe { ComPtr::from_raw(factory) },
+            raw: unsafe { ComPtr::from_raw(factory) },
         }
     }
 
     pub fn as_ptr(&self) -> *const dxgi1_4::IDXGIFactory4 {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn as_mut_ptr(&self) -> *mut dxgi1_4::IDXGIFactory4 {
-        self.native.as_raw()
+        self.raw.as_raw()
+    }
+
+    pub fn as_factory1(&self) -> Factory1 {
+        Factory1 {
+            raw: self.raw.cast::<dxgi::IDXGIFactory1>().unwrap(),
+        }
     }
 
     pub fn as_factory2(&self) -> Factory2 {
         Factory2 {
-            native: self.native.cast::<dxgi1_2::IDXGIFactory2>().unwrap(),
+            raw: self.raw.cast::<dxgi1_2::IDXGIFactory2>().unwrap(),
         }
+    }
+
+    pub fn get_adapter_warp(&self) -> Adapter4 {
+        let adapter1 = self.enumerate_warp_adapters();
+        Adapter4 {
+            raw: adapter1.raw.cast::<dxgi1_6::IDXGIAdapter4>().unwrap(),
+        }
+    }
+
+    pub fn get_adapter(&self) -> Adapter4 {
+        let mut adapter4: *mut dxgi1_6::IDXGIAdapter4 = ptr::null_mut();
+
+        let mut index = 0;
+        let mut max_dedicated_vdeo_memory = 0;
+        loop {
+            match self.enumerate_adapters(index) {
+                None => break,
+                Some(adapter1) => {
+                    index += 1;
+
+                    let mut desc: dxgi::DXGI_ADAPTER_DESC1 = unsafe { mem::zeroed() };
+                    adapter1.get_desc(&mut desc);
+
+                    // We want only the hardware adapter with the largest dedicated video memory
+                    let hr = unsafe {
+                        d3d12::D3D12CreateDevice(
+                            adapter1.as_mut_ptr() as *mut _,
+                            d3dcommon::D3D_FEATURE_LEVEL_11_0,
+                            &d3d12::ID3D12Device::uuidof(),
+                            ptr::null_mut(),
+                        )
+                    };
+                    if (desc.Flags & winapi::shared::dxgi::DXGI_ADAPTER_FLAG_SOFTWARE) == 0
+                        && desc.DedicatedVideoMemory > max_dedicated_vdeo_memory
+                        && winerror::SUCCEEDED(hr)
+                    {
+                        max_dedicated_vdeo_memory = desc.DedicatedVideoMemory;
+
+                        // Perform QueryInterface fun, because we're not using ComPtrs.
+                        // TODO: Code repetition, need a function or struct to handle this
+                        unsafe {
+                            let as_unknown: &IUnknown = &*(adapter1.as_mut_ptr() as *mut IUnknown);
+                            let err = as_unknown.QueryInterface(
+                                &dxgi1_6::IDXGIAdapter4::uuidof(),
+                                &mut adapter4 as *mut *mut _ as *mut *mut _,
+                            );
+                            if err < 0 {
+                                panic!("Failed on casting into a DXGI 1.5 adapter: {:?}", hr);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Adapter4 {
+            raw: unsafe { ComPtr::from_raw(adapter4) },
+        }
+    }
+
+    pub fn is_tearing_supported(&self) -> bool {
+        let adapter5 = Adapter5 {
+            raw: self.raw.cast::<dxgi1_5::IDXGIFactory5>().unwrap(),
+        };
+
+        adapter5.check_for_feature_support(DxgiFeature::AllowTearing)
     }
 
     pub fn create_swap_chain_for_hwnd(
@@ -324,7 +307,7 @@ impl Factory4 {
         command_queue: &CommandQueue,
         desc: &SwapChainDesc,
         hwnd: HWND,
-    ) -> *mut dxgi1_2::IDXGISwapChain1 {
+    ) -> SwapChain1 {
         self.as_factory2()
             .create_swap_chain_for_hwnd(command_queue, desc, hwnd)
     }
@@ -332,17 +315,95 @@ impl Factory4 {
     pub fn make_window_association(&self, hwnd: HWND, flags: WindowAssociationFlags) {
         self.as_factory2().make_window_association(hwnd, flags);
     }
+
+    pub fn enumerate_warp_adapters(&self) -> Adapter1 {
+        let mut adapter: *mut dxgi::IDXGIAdapter1 = ptr::null_mut();
+        let hr = unsafe {
+            self.raw.EnumWarpAdapter(
+                &dxgi::IDXGIAdapter1::uuidof(),
+                &mut adapter as *mut *mut _ as *mut *mut _,
+            )
+        };
+        if !winerror::SUCCEEDED(hr) {
+            panic!("Failed on enumerating DXGI warp adapter: {:?}", hr);
+        }
+
+        Adapter1 {
+            raw: unsafe { ComPtr::from_raw(adapter) },
+        }
+    }
+
+    pub fn enumerate_adapters(&self, index: u32) -> Option<Adapter1> {
+        self.as_factory1().enumerate_adapters(index)
+    }
+}
+
+pub struct Adapter1 {
+    raw: ComPtr<dxgi::IDXGIAdapter1>,
+}
+
+impl Adapter1 {
+    pub fn get_desc(&self, desc: &mut dxgi::DXGI_ADAPTER_DESC1) {
+        let hr = unsafe { self.raw.GetDesc1(desc) };
+        if !winerror::SUCCEEDED(hr) {
+            panic!("Failed on obtaining swap chain description: {:?}", hr);
+        }
+    }
+
+    pub fn as_ptr(&self) -> *const dxgi::IDXGIAdapter1 {
+        self.raw.as_raw()
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut dxgi::IDXGIAdapter1 {
+        self.raw.as_raw()
+    }
+}
+
+pub struct Adapter4 {
+    raw: ComPtr<dxgi1_6::IDXGIAdapter4>,
+}
+
+impl Adapter4 {
+    pub fn as_ptr(&self) -> *const dxgi1_6::IDXGIAdapter4 {
+        self.raw.as_raw()
+    }
+
+    pub fn as_mut_ptr(&self) -> *mut dxgi1_6::IDXGIAdapter4 {
+        self.raw.as_raw()
+    }
+}
+
+pub struct Adapter5 {
+    raw: ComPtr<dxgi1_5::IDXGIFactory5>,
+}
+
+impl Adapter5 {
+    pub fn check_for_feature_support(&self, feature: DxgiFeature) -> bool {
+        let mut allow_tearing = minwindef::FALSE;
+        let hr = unsafe {
+            self.raw.CheckFeatureSupport(
+                feature as _,
+                &mut allow_tearing as *mut _ as *mut _,
+                mem::size_of::<minwindef::BOOL>() as _,
+            )
+        };
+        if !winerror::SUCCEEDED(hr) {
+            allow_tearing = minwindef::FALSE;
+        }
+
+        allow_tearing == minwindef::TRUE
+    }
 }
 
 pub struct SwapChain {
-    native: ComPtr<dxgi::IDXGISwapChain>,
+    raw: ComPtr<dxgi::IDXGISwapChain>,
 }
 
 impl SwapChain {
-    pub fn get_buffer(&self, index: u32) -> ComPtr<d3d12::ID3D12Resource> {
+    pub fn get_buffer(&self, index: u32) -> Resource {
         let mut back_buffer: *mut d3d12::ID3D12Resource = ptr::null_mut();
         let hr = unsafe {
-            self.native.GetBuffer(
+            self.raw.GetBuffer(
                 index,
                 &d3d12::ID3D12Resource::uuidof(),
                 &mut back_buffer as *mut *mut _ as *mut *mut _,
@@ -355,18 +416,20 @@ impl SwapChain {
             );
         }
 
-        unsafe { ComPtr::from_raw(back_buffer) }
+        Resource {
+            raw: unsafe { ComPtr::from_raw(back_buffer) },
+        }
     }
 
     pub fn get_desc(&self, desc: &mut dxgi::DXGI_SWAP_CHAIN_DESC) {
-        let hr = unsafe { self.native.GetDesc(desc) };
+        let hr = unsafe { self.raw.GetDesc(desc) };
         if !winerror::SUCCEEDED(hr) {
             panic!("Failed on obtaining swap chain description: {:?}", hr);
         }
     }
 
     pub fn present(&self, sync_interval: u32, flags: u32) {
-        let hr = unsafe { self.native.Present(sync_interval, flags) };
+        let hr = unsafe { self.raw.Present(sync_interval, flags) };
         if !winerror::SUCCEEDED(hr) {
             panic!(
                 "Failed on presenting the swap chain's current back buffer: {:?}",
@@ -380,7 +443,7 @@ impl SwapChain {
         self.get_desc(&mut desc);
 
         let hr = unsafe {
-            self.native.ResizeBuffers(
+            self.raw.ResizeBuffers(
                 buffers_count,
                 width,
                 height,
@@ -395,61 +458,59 @@ impl SwapChain {
 }
 
 pub struct SwapChain1 {
-    native: ComPtr<dxgi1_2::IDXGISwapChain1>,
+    raw: ComPtr<dxgi1_2::IDXGISwapChain1>,
 }
 
 impl SwapChain1 {
     pub fn as_swap_chain(&self) -> SwapChain {
         SwapChain {
-            native: self.native.cast::<dxgi::IDXGISwapChain>().unwrap(),
+            raw: self.raw.cast::<dxgi::IDXGISwapChain>().unwrap(),
         }
     }
 }
 
 pub struct SwapChain3 {
-    native: ComPtr<dxgi1_4::IDXGISwapChain3>,
+    raw: ComPtr<dxgi1_4::IDXGISwapChain3>,
 }
 
 impl SwapChain3 {
     pub fn get_current_back_buffer_index(&self) -> u32 {
-        unsafe { self.native.GetCurrentBackBufferIndex() }
+        unsafe { self.raw.GetCurrentBackBufferIndex() }
     }
 }
 
 pub struct SwapChain4 {
-    native: ComPtr<dxgi1_5::IDXGISwapChain4>,
+    raw: ComPtr<dxgi1_5::IDXGISwapChain4>,
 }
 
 impl SwapChain4 {
-    pub fn new(
+    pub fn create(
         factory: &Factory4,
         command_queue: &CommandQueue,
         desc: &SwapChainDesc,
         hwnd: HWND,
     ) -> Self {
-        let swap_chain1 = unsafe {
-            ComPtr::from_raw(factory.create_swap_chain_for_hwnd(command_queue, desc, hwnd))
-        };
+        let swap_chain1 = factory.create_swap_chain_for_hwnd(command_queue, desc, hwnd);
         SwapChain4 {
-            native: swap_chain1.cast::<dxgi1_5::IDXGISwapChain4>().unwrap(),
+            raw: swap_chain1.raw.cast::<dxgi1_5::IDXGISwapChain4>().unwrap(),
         }
     }
 
     pub fn as_swap_chain(&self) -> SwapChain {
         SwapChain {
-            native: self.native.cast::<dxgi::IDXGISwapChain>().unwrap(),
+            raw: self.raw.cast::<dxgi::IDXGISwapChain>().unwrap(),
         }
     }
 
     pub fn as_swap_chain1(&self) -> SwapChain1 {
         SwapChain1 {
-            native: self.native.cast::<dxgi1_2::IDXGISwapChain1>().unwrap(),
+            raw: self.raw.cast::<dxgi1_2::IDXGISwapChain1>().unwrap(),
         }
     }
 
     pub fn as_swap_chain3(&self) -> SwapChain3 {
         SwapChain3 {
-            native: self.native.cast::<dxgi1_4::IDXGISwapChain3>().unwrap(),
+            raw: self.raw.cast::<dxgi1_4::IDXGISwapChain3>().unwrap(),
         }
     }
 
@@ -461,7 +522,7 @@ impl SwapChain4 {
         self.as_swap_chain().get_desc(desc);
     }
 
-    pub fn get_buffer(&self, index: u32) -> ComPtr<d3d12::ID3D12Resource> {
+    pub fn get_buffer(&self, index: u32) -> Resource {
         self.as_swap_chain().get_buffer(index)
     }
 

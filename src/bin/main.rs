@@ -1,4 +1,5 @@
 extern crate graphicx;
+extern crate winit;
 
 use graphicx::dx12;
 
@@ -25,10 +26,20 @@ fn main() {
     // Enable debug layer
     graphicx::dx12::enable_debug_layer();
 
-    let adapter = dx12::Adapter4::new(config.use_warp);
-    let device = dx12::Device::new(&adapter);
-    let command_queue = dx12::CommandQueue::new(
-        &device,
+    let hwnd = window.get_hwnd() as *mut _;
+    let factory = dx12::Factory4::create(if cfg!(debug_assertions) {
+        dx12::FactoryCreationFlags::Debug
+    } else {
+        dx12::FactoryCreationFlags::None
+    });
+    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NoAltEnter);
+    let adapter = if config.use_warp {
+        factory.get_adapter_warp()
+    } else {
+        factory.get_adapter()
+    };
+    let device = dx12::Device::create(&adapter);
+    let command_queue = device.create_command_queue(
         dx12::CommandListType::Direct,
         dx12::CommandQueuePriority::Normal,
         dx12::CommandQueueFlags::None,
@@ -36,14 +47,7 @@ fn main() {
     );
 
     let buffers_count: u32 = 3;
-    let is_tearing_supported = dx12::is_tearing_supported();
-    let factory = dx12::Factory4::new(if cfg!(debug_assertions) {
-        dx12::FactoryCreationFlags::Debug
-    } else {
-        dx12::FactoryCreationFlags::None
-    });
-    let hwnd = window.get_hwnd() as *mut _;
-    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NoAltEnter);
+    let is_tearing_supported = factory.is_tearing_supported();
     let swap_chain_desc = dx12::SwapChainDesc {
         width: config.width,
         height: config.height,
@@ -64,10 +68,9 @@ fn main() {
             dx12::Flags::None
         },
     };
-    let swap_chain = dx12::SwapChain4::new(&factory, &command_queue, &swap_chain_desc, hwnd);
+    let swap_chain = dx12::SwapChain4::create(&factory, &command_queue, &swap_chain_desc, hwnd);
     let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _;
-    let descriptor_heap = dx12::DescriptorHeap::new(
-        &device,
+    let descriptor_heap = device.create_descriptor_heap(
         dx12::DescriptorHeapType::RTV,
         dx12::DescriptorHeapFlags::None,
         buffers_count,
@@ -78,7 +81,7 @@ fn main() {
     let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
     let mut back_buffers: Vec<dx12::Resource> = Vec::with_capacity(buffers_count as _);
     for i in 0..buffers_count {
-        let back_buffer = dx12::Resource::new(&swap_chain, i as u32);
+        let back_buffer = swap_chain.get_buffer(i as u32);
 
         device.create_render_target_view(&back_buffer, descriptor);
         back_buffers.push(back_buffer);
@@ -89,18 +92,14 @@ fn main() {
     let mut command_allocators: Vec<dx12::CommandAllocator> =
         Vec::with_capacity(buffers_count as _);
     for _ in 0..buffers_count {
-        command_allocators.push(dx12::CommandAllocator::new(
-            &device,
-            dx12::CommandListType::Direct,
-        ));
+        command_allocators.push(device.create_command_allocator(dx12::CommandListType::Direct));
     }
-    let graphics_command_list = dx12::GraphicsCommandList::new(
-        &device,
+    let graphics_command_list = device.create_graphics_command_list(
         &command_allocators[current_back_buffer_index],
         dx12::CommandListType::Direct,
     );
 
-    let fence = dx12::Fence::new(&device);
+    let fence = device.create_fence();
     let fence_event = dx12::Event::new(false, false);
     let mut fence_value: u64 = 0;
     let mut frame_fence_values: [u64; 3] = [0, 0, 0];
@@ -223,7 +222,7 @@ fn main() {
             let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
 
             for i in 0..buffers_count {
-                let back_buffer = dx12::Resource::new(&swap_chain, i as u32);
+                let back_buffer = swap_chain.get_buffer(i as u32);
 
                 device.create_render_target_view(&back_buffer, descriptor);
                 back_buffers.push(back_buffer);

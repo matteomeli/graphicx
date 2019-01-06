@@ -1,7 +1,11 @@
-use super::command::{CommandAllocator, CommandListType, CommandQueueFlags, CommandQueuePriority};
-use super::descriptor::{CPUDescriptor, DescriptorHeapFlags, DescriptorHeapType};
+use super::command::{
+    CommandAllocator, CommandListType, CommandQueue, CommandQueueFlags, CommandQueuePriority,
+    GraphicsCommandList,
+};
+use super::descriptor::{CPUDescriptor, DescriptorHeap, DescriptorHeapFlags, DescriptorHeapType};
 use super::dxgi::Adapter4;
 use super::resource::Resource;
+use super::sync::Fence;
 
 use winapi::shared::{minwindef, winerror};
 use winapi::um::unknwnbase::IUnknown;
@@ -13,11 +17,11 @@ use std::mem;
 use std::ptr;
 
 pub struct Device {
-    native: ComPtr<d3d12::ID3D12Device2>,
+    raw: ComPtr<d3d12::ID3D12Device2>,
 }
 
 impl Device {
-    pub fn new(adapter: &Adapter4) -> Self {
+    pub fn create(adapter: &Adapter4) -> Self {
         let mut device: *mut d3d12::ID3D12Device2 = ptr::null_mut();
         let hr = unsafe {
             d3d12::D3D12CreateDevice(
@@ -97,15 +101,19 @@ impl Device {
         }
 
         Device {
-            native: unsafe { ComPtr::from_raw(device) },
+            raw: unsafe { ComPtr::from_raw(device) },
         }
     }
 
-    pub fn create_fence(&self, initial_value: u64) -> ComPtr<d3d12::ID3D12Fence> {
+    pub fn create_fence(&self) -> Fence {
+        self.create_fence_with_value(0)
+    }
+
+    pub fn create_fence_with_value(&self, initial_value: u64) -> Fence {
         let mut fence: *mut d3d12::ID3D12Fence = ptr::null_mut();
 
         let hr = unsafe {
-            self.native.CreateFence(
+            self.raw.CreateFence(
                 initial_value,
                 d3d12::D3D12_FENCE_FLAG_NONE,
                 &d3d12::ID3D12Fence::uuidof(),
@@ -116,7 +124,9 @@ impl Device {
             panic!("Failed on creating fence: {:?}", hr);
         }
 
-        unsafe { ComPtr::from_raw(fence) }
+        Fence {
+            raw: unsafe { ComPtr::from_raw(fence) },
+        }
     }
 
     pub fn create_descriptor_heap(
@@ -125,7 +135,7 @@ impl Device {
         descriptor_flags: DescriptorHeapFlags,
         descriptor_count: u32,
         node_mask: u32,
-    ) -> ComPtr<d3d12::ID3D12DescriptorHeap> {
+    ) -> DescriptorHeap {
         let mut descriptor_heap: *mut d3d12::ID3D12DescriptorHeap = ptr::null_mut();
 
         let desc = d3d12::D3D12_DESCRIPTOR_HEAP_DESC {
@@ -136,7 +146,7 @@ impl Device {
         };
 
         let hr = unsafe {
-            self.native.CreateDescriptorHeap(
+            self.raw.CreateDescriptorHeap(
                 &desc,
                 &d3d12::ID3D12DescriptorHeap::uuidof(),
                 &mut descriptor_heap as *mut *mut _ as *mut *mut _,
@@ -146,7 +156,9 @@ impl Device {
             panic!("Failed on creating a D3D12 descriptor heap: {:?}", hr);
         }
 
-        unsafe { ComPtr::from_raw(descriptor_heap) }
+        DescriptorHeap {
+            raw: unsafe { ComPtr::from_raw(descriptor_heap) },
+        }
     }
 
     pub fn create_command_queue(
@@ -155,7 +167,7 @@ impl Device {
         priority: CommandQueuePriority,
         flags: CommandQueueFlags,
         node_mask: u32,
-    ) -> ComPtr<d3d12::ID3D12CommandQueue> {
+    ) -> CommandQueue {
         let mut command_queue: *mut d3d12::ID3D12CommandQueue = ptr::null_mut();
 
         let desc = d3d12::D3D12_COMMAND_QUEUE_DESC {
@@ -166,7 +178,7 @@ impl Device {
         };
 
         let hr = unsafe {
-            self.native.CreateCommandQueue(
+            self.raw.CreateCommandQueue(
                 &desc,
                 &d3d12::ID3D12CommandQueue::uuidof(),
                 &mut command_queue as *mut *mut _ as *mut *mut _,
@@ -176,17 +188,16 @@ impl Device {
             panic!("Failed on creating D3D12 command queue: {:?}", hr);
         }
 
-        unsafe { ComPtr::from_raw(command_queue) }
+        CommandQueue {
+            raw: unsafe { ComPtr::from_raw(command_queue) },
+        }
     }
 
-    pub fn create_command_allocator(
-        &self,
-        command_list_type: CommandListType,
-    ) -> ComPtr<d3d12::ID3D12CommandAllocator> {
+    pub fn create_command_allocator(&self, command_list_type: CommandListType) -> CommandAllocator {
         let mut command_allocator: *mut d3d12::ID3D12CommandAllocator = ptr::null_mut();
 
         let hr = unsafe {
-            self.native.CreateCommandAllocator(
+            self.raw.CreateCommandAllocator(
                 command_list_type as _,
                 &d3d12::ID3D12CommandAllocator::uuidof(),
                 &mut command_allocator as *mut *mut _ as *mut *mut _,
@@ -196,18 +207,20 @@ impl Device {
             panic!("Failed on creating command allocator: {:?}", hr);
         }
 
-        unsafe { ComPtr::from_raw(command_allocator) }
+        CommandAllocator {
+            raw: unsafe { ComPtr::from_raw(command_allocator) },
+        }
     }
 
     pub fn create_graphics_command_list(
         &self,
         command_allocator: &CommandAllocator,
         command_list_type: CommandListType,
-    ) -> ComPtr<d3d12::ID3D12GraphicsCommandList> {
+    ) -> GraphicsCommandList {
         let mut graphics_command_list: *mut d3d12::ID3D12GraphicsCommandList = ptr::null_mut();
 
         let hr = unsafe {
-            self.native.CreateCommandList(
+            self.raw.CreateCommandList(
                 0,
                 command_list_type as _,
                 command_allocator.as_mut_ptr(),
@@ -225,19 +238,21 @@ impl Device {
             panic!("Failed on closing command list: {:?}", hr);
         }
 
-        unsafe { ComPtr::from_raw(graphics_command_list) }
+        GraphicsCommandList {
+            raw: unsafe { ComPtr::from_raw(graphics_command_list) },
+        }
     }
 
     pub fn create_render_target_view(&self, resource: &Resource, descriptor: CPUDescriptor) {
         unsafe {
-            self.native
+            self.raw
                 .CreateRenderTargetView(resource.as_mut_ptr(), ptr::null(), descriptor)
         };
     }
 
     pub fn get_descriptor_increment_size(&self, descriptor_heap_type: DescriptorHeapType) -> u32 {
         unsafe {
-            self.native
+            self.raw
                 .GetDescriptorHandleIncrementSize(descriptor_heap_type as _)
         }
     }

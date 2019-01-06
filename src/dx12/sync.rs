@@ -1,5 +1,3 @@
-use super::device::Device;
-
 use winapi::shared::winerror;
 use winapi::um::{d3d12, handleapi, synchapi, winnt};
 use wio::com::ComPtr;
@@ -36,38 +34,28 @@ impl Event {
 }
 
 pub struct Fence {
-    native: ComPtr<d3d12::ID3D12Fence>,
+    pub(crate) raw: ComPtr<d3d12::ID3D12Fence>,
 }
 
 impl Fence {
-    pub fn new(device: &Device) -> Self {
-        Fence::with_value(device, 0)
-    }
-
-    pub fn with_value(device: &Device, initial_value: u64) -> Self {
-        Fence {
-            native: device.create_fence(initial_value),
-        }
-    }
-
     pub fn as_ptr(&self) -> *const d3d12::ID3D12Fence {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn as_mut_ptr(&self) -> *mut d3d12::ID3D12Fence {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn signal(&self, value: u64) -> winerror::HRESULT {
-        unsafe { self.native.Signal(value) }
+        unsafe { self.raw.Signal(value) }
     }
 
     pub fn get_value(&self) -> u64 {
-        unsafe { self.native.GetCompletedValue() }
+        unsafe { self.raw.GetCompletedValue() }
     }
 
     pub fn set_event_on_completion(&self, event: Event, value: u64) -> winerror::HRESULT {
-        unsafe { self.native.SetEventOnCompletion(value, event.handle) }
+        unsafe { self.raw.SetEventOnCompletion(value, event.handle) }
     }
 
     pub fn wait_for_value(&self, event: Event, value: u64) {

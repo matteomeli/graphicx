@@ -1,6 +1,5 @@
 use super::barrier::BarrierDesc;
 use super::descriptor::CPUDescriptor;
-use super::device::Device;
 use super::resource::Resource;
 use super::sync::{Event, Fence};
 
@@ -30,26 +29,20 @@ bitflags! {
 }
 
 pub struct CommandAllocator {
-    native: ComPtr<d3d12::ID3D12CommandAllocator>,
+    pub(crate) raw: ComPtr<d3d12::ID3D12CommandAllocator>,
 }
 
 impl CommandAllocator {
-    pub fn new(device: &Device, command_list_type: CommandListType) -> Self {
-        CommandAllocator {
-            native: device.create_command_allocator(command_list_type),
-        }
-    }
-
     pub fn as_ptr(&self) -> *const d3d12::ID3D12CommandAllocator {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn as_mut_ptr(&self) -> *mut d3d12::ID3D12CommandAllocator {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn reset(&self) {
-        let hr = unsafe { self.native.Reset() };
+        let hr = unsafe { self.raw.Reset() };
         if !winerror::SUCCEEDED(hr) {
             panic!("Failed on resetting command allocator: {:?}", hr);
         }
@@ -57,51 +50,41 @@ impl CommandAllocator {
 }
 
 pub struct CommandList {
-    native: ComPtr<d3d12::ID3D12CommandList>,
+    raw: ComPtr<d3d12::ID3D12CommandList>,
 }
 
 impl CommandList {
     pub fn as_ptr(&self) -> *const d3d12::ID3D12CommandList {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn as_mut_ptr(&self) -> *mut d3d12::ID3D12CommandList {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 }
 
 pub struct GraphicsCommandList {
-    native: ComPtr<d3d12::ID3D12GraphicsCommandList>,
+    pub(crate) raw: ComPtr<d3d12::ID3D12GraphicsCommandList>,
 }
 
 impl GraphicsCommandList {
-    pub fn new(
-        device: &Device,
-        command_allocator: &CommandAllocator,
-        command_list_type: CommandListType,
-    ) -> Self {
-        GraphicsCommandList {
-            native: device.create_graphics_command_list(command_allocator, command_list_type),
-        }
-    }
-
     pub fn as_command_list(&self) -> CommandList {
         CommandList {
-            native: self.native.clone().up::<d3d12::ID3D12CommandList>(),
+            raw: self.raw.clone().up::<d3d12::ID3D12CommandList>(),
         }
     }
 
     pub fn as_ptr(&self) -> *const d3d12::ID3D12GraphicsCommandList {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn as_mut_ptr(&self) -> *mut d3d12::ID3D12GraphicsCommandList {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn reset(&self, command_allocator: &CommandAllocator) {
         let hr = unsafe {
-            self.native
+            self.raw
                 .Reset(command_allocator.as_mut_ptr(), ptr::null_mut())
         };
         if !winerror::SUCCEEDED(hr) {
@@ -133,7 +116,7 @@ impl GraphicsCommandList {
 
         if !transition_barriers.is_empty() {
             unsafe {
-                self.native
+                self.raw
                     .ResourceBarrier(transition_barriers.len() as _, transition_barriers.as_ptr())
             };
         }
@@ -141,13 +124,13 @@ impl GraphicsCommandList {
 
     pub fn clear_render_target_view(&self, rtv: CPUDescriptor, clear_color: [f32; 4]) {
         unsafe {
-            self.native
+            self.raw
                 .ClearRenderTargetView(rtv, &clear_color, 0, ptr::null())
         };
     }
 
     pub fn close(&self) {
-        let hr = unsafe { self.native.Close() };
+        let hr = unsafe { self.raw.Close() };
         if !winerror::SUCCEEDED(hr) {
             panic!("Failed on closing command list: {:?}", hr);
         }
@@ -155,33 +138,21 @@ impl GraphicsCommandList {
 }
 
 pub struct CommandQueue {
-    native: ComPtr<d3d12::ID3D12CommandQueue>,
+    pub(crate) raw: ComPtr<d3d12::ID3D12CommandQueue>,
 }
 
 impl CommandQueue {
-    pub fn new(
-        device: &Device,
-        command_list_type: CommandListType,
-        priority: CommandQueuePriority,
-        flags: CommandQueueFlags,
-        node_mask: u32,
-    ) -> Self {
-        CommandQueue {
-            native: device.create_command_queue(command_list_type, priority, flags, node_mask),
-        }
-    }
-
     pub fn as_ptr(&self) -> *const d3d12::ID3D12CommandQueue {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn as_mut_ptr(&self) -> *mut d3d12::ID3D12CommandQueue {
-        self.native.as_raw()
+        self.raw.as_raw()
     }
 
     pub fn signal(&self, fence: &Fence, value: &mut u64) -> u64 {
         *value += 1;
-        let hr = unsafe { self.native.Signal(fence.as_mut_ptr(), *value) };
+        let hr = unsafe { self.raw.Signal(fence.as_mut_ptr(), *value) };
         if !winerror::SUCCEEDED(hr) {
             panic!("Failed on signalling fence value {}: {:?}", *value, hr);
         }
@@ -199,7 +170,7 @@ impl CommandQueue {
             .map(|command_list| command_list.as_mut_ptr())
             .collect();
         unsafe {
-            self.native
+            self.raw
                 .ExecuteCommandLists(lists.len() as _, lists.as_ptr())
         };
     }
