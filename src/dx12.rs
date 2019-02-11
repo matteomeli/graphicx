@@ -1,11 +1,11 @@
-pub mod barrier;
-pub mod command;
-pub mod debug;
-pub mod descriptor;
-pub mod device;
-pub mod dxgi;
-pub mod resource;
-pub mod sync;
+mod barrier;
+mod command;
+mod debug;
+mod descriptor;
+mod device;
+mod dxgi;
+mod resource;
+mod sync;
 
 pub use barrier::{BarrierDesc, BarrierFlags};
 pub use command::{
