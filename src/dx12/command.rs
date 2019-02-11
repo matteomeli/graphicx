@@ -3,12 +3,13 @@ use super::descriptor::CPUDescriptor;
 use super::resource::Resource;
 use super::sync::{Event, Fence};
 
+use std::mem;
+use std::ptr;
+
+use bitflags::bitflags;
 use winapi::shared::winerror;
 use winapi::um::d3d12;
 use wio::com::ComPtr;
-
-use std::mem;
-use std::ptr;
 
 #[repr(u32)]
 #[derive(Copy, Clone)]
@@ -166,7 +167,7 @@ impl CommandQueue {
 
     pub fn execute(&self, command_lists: &[CommandList]) {
         let lists: Vec<*mut d3d12::ID3D12CommandList> = command_lists
-            .into_iter()
+            .iter()
             .map(|command_list| command_list.as_mut_ptr())
             .collect();
         unsafe {

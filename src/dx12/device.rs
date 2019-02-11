@@ -7,14 +7,14 @@ use super::dxgi::Adapter4;
 use super::resource::Resource;
 use super::sync::Fence;
 
+use std::mem;
+use std::ptr;
+
 use winapi::shared::{minwindef, winerror};
 use winapi::um::unknwnbase::IUnknown;
 use winapi::um::{d3d12, d3d12sdklayers, d3dcommon};
 use winapi::Interface;
 use wio::com::ComPtr;
-
-use std::mem;
-use std::ptr;
 
 pub struct Device {
     raw: ComPtr<d3d12::ID3D12Device2>,

@@ -2,9 +2,9 @@ use winapi::shared::winerror;
 use winapi::um::{d3d12, d3d12sdklayers};
 use winapi::Interface;
 
-use wio::com::ComPtr;
-
 use std::ptr;
+
+use wio::com::ComPtr;
 
 pub struct Debug {
     raw: ComPtr<d3d12sdklayers::ID3D12Debug>,

@@ -1,6 +1,12 @@
 use super::command::CommandQueue;
 use super::resource::Resource;
 
+use std::ffi::OsString;
+use std::mem;
+use std::os::windows::ffi::OsStringExt;
+use std::ptr;
+
+use bitflags::bitflags;
 use winapi::shared::windef::HWND;
 use winapi::shared::{
     dxgi, dxgi1_2, dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, dxgiformat, dxgitype, minwindef, winerror,
@@ -9,9 +15,6 @@ use winapi::um::unknwnbase::IUnknown;
 use winapi::um::{d3d12, d3dcommon};
 use winapi::Interface;
 use wio::com::ComPtr;
-
-use std::mem;
-use std::ptr;
 
 bitflags! {
     pub struct WindowAssociationFlags: u32 {
@@ -263,13 +266,14 @@ impl Factory4 {
 
         let mut index = 0;
         let mut max_dedicated_vdeo_memory = 0;
+        let mut device_name = String::new();
+        let mut desc: dxgi::DXGI_ADAPTER_DESC1 = unsafe { mem::zeroed() };
         loop {
             match self.enumerate_adapters(index) {
                 None => break,
                 Some(adapter1) => {
                     index += 1;
 
-                    let mut desc: dxgi::DXGI_ADAPTER_DESC1 = unsafe { mem::zeroed() };
                     adapter1.get_desc(&mut desc);
 
                     // We want only the hardware adapter with the largest dedicated video memory
@@ -287,6 +291,13 @@ impl Factory4 {
                     {
                         max_dedicated_vdeo_memory = desc.DedicatedVideoMemory;
 
+                        device_name = {
+                            let len = desc.Description.iter().take_while(|&&c| c != 0).count();
+                            let name =
+                                <OsString as OsStringExt>::from_wide(&desc.Description[..len]);
+                            name.to_string_lossy().into_owned()
+                        };
+
                         // Perform QueryInterface fun, because we're not using ComPtrs.
                         // TODO: Code repetition, need a function or struct to handle this
                         unsafe {
@@ -303,6 +314,12 @@ impl Factory4 {
                 }
             }
         }
+
+        println!(
+            "Using '{}' device with {}MB of memory.",
+            device_name,
+            max_dedicated_vdeo_memory / 1024 / 1024
+        );
 
         Adapter4 {
             raw: unsafe { ComPtr::from_raw(adapter4) },

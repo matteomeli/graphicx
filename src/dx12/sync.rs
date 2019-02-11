@@ -1,8 +1,8 @@
+use std::ptr;
+
 use winapi::shared::winerror;
 use winapi::um::{d3d12, handleapi, synchapi, winnt};
 use wio::com::ComPtr;
-
-use std::ptr;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(transparent)]

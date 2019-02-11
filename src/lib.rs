@@ -1,7 +1,3 @@
-#[macro_use]
-extern crate bitflags;
-extern crate winit;
-
 pub mod dx12;
 
 use std::fmt;

@@ -1,8 +1,9 @@
 use super::resource::ResourceStates;
 
-use winapi::um::d3d12;
-
 use std::ops::Range;
+
+use bitflags::bitflags;
+use winapi::um::d3d12;
 
 bitflags! {
     pub struct BarrierFlags: u32 {

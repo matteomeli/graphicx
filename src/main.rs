@@ -1,10 +1,6 @@
-extern crate graphicx;
-
 use graphicx::dx12;
-
-use winit::os::windows::WindowExt;
-
 use std::env;
+use winit::os::windows::WindowExt;
 
 fn main() {
     // Parse command line args into a config
