@@ -25,7 +25,7 @@ pub enum CommandQueuePriority {
 
 bitflags! {
     pub struct CommandQueueFlags: u32 {
-        const None = d3d12::D3D12_COMMAND_QUEUE_FLAG_NONE;
+        const NONE = d3d12::D3D12_COMMAND_QUEUE_FLAG_NONE;
     }
 }
 

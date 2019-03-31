@@ -10,7 +10,7 @@ pub enum DescriptorHeapType {
 
 bitflags! {
     pub struct DescriptorHeapFlags: u32 {
-        const None = d3d12::D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        const NONE = d3d12::D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     }
 }
 

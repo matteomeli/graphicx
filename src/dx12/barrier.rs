@@ -7,9 +7,9 @@ use winapi::um::d3d12;
 
 bitflags! {
     pub struct BarrierFlags: u32 {
-        const None = d3d12::D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        const Beginnly = d3d12::D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
-        const EndOnly = d3d12::D3D12_RESOURCE_BARRIER_FLAG_END_ONLY;
+        const NONE = d3d12::D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        const BEGIN_ONLY = d3d12::D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+        const END_ONLY = d3d12::D3D12_RESOURCE_BARRIER_FLAG_END_ONLY;
     }
 }
 
@@ -23,7 +23,7 @@ impl BarrierDesc {
     pub fn new(index: usize, states: Range<ResourceStates>) -> Self {
         BarrierDesc {
             index,
-            flags: BarrierFlags::None,
+            flags: BarrierFlags::NONE,
             states,
         }
     }

@@ -28,11 +28,11 @@ fn main() {
 
     let hwnd = window.get_hwnd() as *mut _;
     let factory = dx12::Factory4::create(if cfg!(debug_assertions) {
-        dx12::FactoryCreationFlags::Debug
+        dx12::FactoryCreationFlags::DEBUG
     } else {
-        dx12::FactoryCreationFlags::None
+        dx12::FactoryCreationFlags::NONE
     });
-    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NoAltEnter);
+    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NO_ALT_ENTER);
     let adapter = if config.use_warp {
         factory.get_adapter_warp()
     } else {
@@ -42,7 +42,7 @@ fn main() {
     let command_queue = device.create_command_queue(
         dx12::CommandListType::Direct,
         dx12::CommandQueuePriority::Normal,
-        dx12::CommandQueueFlags::None,
+        dx12::CommandQueueFlags::NONE,
         0,
     );
 
@@ -57,22 +57,22 @@ fn main() {
             count: 1,
             quality: 0,
         },
-        buffer_usage: dx12::Usage::RenderTargetOutput,
+        buffer_usage: dx12::Usage::RENDER_TARGET_OUTPUT,
         buffer_count: buffers_count,
         scaling: dx12::Scaling::Stretch,
         swap_effect: dx12::SwapEffect::FlipDiscard,
         alpha_mode: dx12::AlphaMode::Unspecified,
         flags: if is_tearing_supported {
-            dx12::Flags::AllowTearing
+            dx12::Flags::ALLOW_TEARING
         } else {
-            dx12::Flags::None
+            dx12::Flags::NONE
         },
     };
     let swap_chain = dx12::SwapChain4::create(&factory, &command_queue, &swap_chain_desc, hwnd);
     let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _;
     let descriptor_heap = device.create_descriptor_heap(
         dx12::DescriptorHeapType::RTV,
-        dx12::DescriptorHeapFlags::None,
+        dx12::DescriptorHeapFlags::NONE,
         buffers_count,
         0,
     );
@@ -102,7 +102,7 @@ fn main() {
     let fence = device.create_fence();
     let fence_event = dx12::Event::new(false, false);
     let mut fence_value: u64 = 0;
-    let mut frame_fence_values: [u64; 3] = [0, 0, 0];
+    let mut frame_fence_values: [u64; 3] = [0, 0, 0]; // Triple buffering
 
     let mut is_resize_requested = false;
     let mut is_fullscreen = config.is_fullscreen;
@@ -249,7 +249,7 @@ fn main() {
             {
                 let barriers = vec![dx12::BarrierDesc::new(
                     current_back_buffer_index,
-                    dx12::ResourceStates::Present..dx12::ResourceStates::RenderTarget,
+                    dx12::ResourceStates::PRESENT..dx12::ResourceStates::RENDER_TARGET,
                 )];
                 graphics_command_list.insert_transition_barriers(&barriers, &back_buffers);
 
@@ -264,7 +264,7 @@ fn main() {
             {
                 let barriers = vec![dx12::BarrierDesc::new(
                     current_back_buffer_index,
-                    dx12::ResourceStates::RenderTarget..dx12::ResourceStates::Present,
+                    dx12::ResourceStates::RENDER_TARGET..dx12::ResourceStates::PRESENT,
                 )];
                 graphics_command_list.insert_transition_barriers(&barriers, &back_buffers);
 
@@ -275,9 +275,9 @@ fn main() {
 
                 let sync_interval = if config.is_vsync_enabled { 1 } else { 0 };
                 let present_flags = if is_tearing_supported && !config.is_vsync_enabled {
-                    dx12::PresentFlags::AllowTearing
+                    dx12::PresentFlags::ALLOW_TEARING
                 } else {
-                    dx12::PresentFlags::None
+                    dx12::PresentFlags::NONE
                 };
                 swap_chain.present(sync_interval, present_flags);
 

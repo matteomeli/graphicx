@@ -4,8 +4,8 @@ use wio::com::ComPtr;
 
 bitflags! {
     pub struct ResourceStates: u32 {
-        const Present = d3d12::D3D12_RESOURCE_STATE_PRESENT;
-        const RenderTarget = d3d12::D3D12_RESOURCE_STATE_RENDER_TARGET;
+        const PRESENT = d3d12::D3D12_RESOURCE_STATE_PRESENT;
+        const RENDER_TARGET = d3d12::D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 }
 

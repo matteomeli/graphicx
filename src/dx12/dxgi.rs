@@ -18,17 +18,17 @@ use wio::com::ComPtr;
 
 bitflags! {
     pub struct WindowAssociationFlags: u32 {
-        const NoWindowChanges = 1;
-        const NoAltEnter = 1 << 1;
-        const NoPrintScreen = 1 << 2;
-        const Valid = 0x7;
+        const NO_WINDOW_CHANGES = 1;
+        const NO_ALT_ENTER = 1 << 1;
+        const NO_PRINT_SCREEN = 1 << 2;
+        const VALID = 0x7;
     }
 }
 
 bitflags! {
     pub struct FactoryCreationFlags: u32 {
-        const None = 0;
-        const Debug = dxgi1_3::DXGI_CREATE_FACTORY_DEBUG;
+        const NONE = 0;
+        const DEBUG = dxgi1_3::DXGI_CREATE_FACTORY_DEBUG;
     }
 }
 
@@ -39,18 +39,18 @@ pub struct SampleDesc {
 
 bitflags! {
     pub struct Usage: u32 {
-        const AccessNone = dxgitype::DXGI_CPU_ACCESS_NONE;
-        const AccessDynamic = dxgitype::DXGI_CPU_ACCESS_DYNAMIC;
-        const AccessReadWrite = dxgitype::DXGI_CPU_ACCESS_READ_WRITE;
-        const AccessScratch = dxgitype::DXGI_CPU_ACCESS_SCRATCH;
-        const AccessField = dxgitype::DXGI_CPU_ACCESS_FIELD;
-        const ShaderInput = dxgitype::DXGI_USAGE_SHADER_INPUT;
-        const RenderTargetOutput = dxgitype::DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        const BackBuffer = dxgitype::DXGI_USAGE_BACK_BUFFER;
-        const Shared = dxgitype::DXGI_USAGE_SHARED;
-        const ReadOnly = dxgitype::DXGI_USAGE_READ_ONLY;
-        const DiscardOnPresent = dxgitype::DXGI_USAGE_DISCARD_ON_PRESENT;
-        const UnorderedAccess = dxgitype::DXGI_USAGE_UNORDERED_ACCESS;
+        const ACCESS_NONE = dxgitype::DXGI_CPU_ACCESS_NONE;
+        const ACCESS_DYNAMIC = dxgitype::DXGI_CPU_ACCESS_DYNAMIC;
+        const ACCESS_READ_WRITE = dxgitype::DXGI_CPU_ACCESS_READ_WRITE;
+        const ACCESS_SCRATCH = dxgitype::DXGI_CPU_ACCESS_SCRATCH;
+        const ACCESS_FIELD = dxgitype::DXGI_CPU_ACCESS_FIELD;
+        const SHADER_INPUT = dxgitype::DXGI_USAGE_SHADER_INPUT;
+        const RENDER_TARGET_OUTPUT = dxgitype::DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        const BACK_BUFFER = dxgitype::DXGI_USAGE_BACK_BUFFER;
+        const SHARED = dxgitype::DXGI_USAGE_SHARED;
+        const READ_ONLY = dxgitype::DXGI_USAGE_READ_ONLY;
+        const DISCARD_ON_PRESENT = dxgitype::DXGI_USAGE_DISCARD_ON_PRESENT;
+        const UNORDERED_ACCESS = dxgitype::DXGI_USAGE_UNORDERED_ACCESS;
     }
 }
 
@@ -89,34 +89,34 @@ pub enum DxgiFeature {
 
 bitflags! {
     pub struct PresentFlags: u32 {
-        const None = 0;
-        const DoNotSequence = dxgi::DXGI_PRESENT_DO_NOT_SEQUENCE;
-        const Test = dxgi::DXGI_PRESENT_TEST;
-        const Restart = dxgi::DXGI_PRESENT_RESTART;
-        const DoNotWait = dxgi::DXGI_PRESENT_DO_NOT_WAIT;
-        const RestrictToOutput = dxgi::DXGI_PRESENT_RESTRICT_TO_OUTPUT;
-        const PreferRight = dxgi::DXGI_PRESENT_STEREO_PREFER_RIGHT;
-        const StereoTemporaryMono = dxgi::DXGI_PRESENT_STEREO_TEMPORARY_MONO;
-        const UseDuration = dxgi::DXGI_PRESENT_USE_DURATION;
-        const AllowTearing = dxgi::DXGI_PRESENT_ALLOW_TEARING;
+        const NONE = 0;
+        const DO_NOT_SEQUENCE = dxgi::DXGI_PRESENT_DO_NOT_SEQUENCE;
+        const TEST = dxgi::DXGI_PRESENT_TEST;
+        const RESTART = dxgi::DXGI_PRESENT_RESTART;
+        const DO_NOT_WAIT = dxgi::DXGI_PRESENT_DO_NOT_WAIT;
+        const RESTRICT_TO_OUTPUT = dxgi::DXGI_PRESENT_RESTRICT_TO_OUTPUT;
+        const PREFER_RIGHT = dxgi::DXGI_PRESENT_STEREO_PREFER_RIGHT;
+        const STEREO_TEMPORARY_MONO = dxgi::DXGI_PRESENT_STEREO_TEMPORARY_MONO;
+        const USE_DURATION = dxgi::DXGI_PRESENT_USE_DURATION;
+        const ALLOW_TEARING = dxgi::DXGI_PRESENT_ALLOW_TEARING;
     }
 }
 
 bitflags! {
     pub struct Flags: u32 {
-        const None = 0;
-        const NonPrerotated = dxgi::DXGI_SWAP_CHAIN_FLAG_NONPREROTATED;
-        const AllowModeSwitch = dxgi::DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-        const GDICompatible = dxgi::DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE;
-        const RestrictedContent = dxgi::DXGI_SWAP_CHAIN_FLAG_RESTRICTED_CONTENT;
-        const RestrictSharedResourceDriver = dxgi::DXGI_SWAP_CHAIN_FLAG_RESTRICT_SHARED_RESOURCE_DRIVER;
-        const DispatchOnly = dxgi::DXGI_SWAP_CHAIN_FLAG_DISPLAY_ONLY;
-        const FrameLatencyWaitableObject = dxgi::DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
-        const ForegroundLayer = dxgi::DXGI_SWAP_CHAIN_FLAG_FOREGROUND_LAYER;
-        const FullscreenVideo = dxgi::DXGI_SWAP_CHAIN_FLAG_FULLSCREEN_VIDEO;
-        const YUVVideo = dxgi::DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO;
-        const HWProtected = dxgi::DXGI_SWAP_CHAIN_FLAG_HW_PROTECTED;
-        const AllowTearing = dxgi::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+        const NONE = 0;
+        const NON_PREROTATED = dxgi::DXGI_SWAP_CHAIN_FLAG_NONPREROTATED;
+        const ALLOW_MODE_SWITCH = dxgi::DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+        const GDO_COMPATIBLE = dxgi::DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE;
+        const RESTRICTED_CONTENT = dxgi::DXGI_SWAP_CHAIN_FLAG_RESTRICTED_CONTENT;
+        const RESTRICT_SHARED_RESOURCE_DRIVER = dxgi::DXGI_SWAP_CHAIN_FLAG_RESTRICT_SHARED_RESOURCE_DRIVER;
+        const DISPATCH_ONLY = dxgi::DXGI_SWAP_CHAIN_FLAG_DISPLAY_ONLY;
+        const FRAME_LATENCY_WAITABLE_OBJECT = dxgi::DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+        const FOREGROUND_LAYER = dxgi::DXGI_SWAP_CHAIN_FLAG_FOREGROUND_LAYER;
+        const FULLSCREEN_VIDEO = dxgi::DXGI_SWAP_CHAIN_FLAG_FULLSCREEN_VIDEO;
+        const YUV_VIDEO = dxgi::DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO;
+        const HW_PROTECTED = dxgi::DXGI_SWAP_CHAIN_FLAG_HW_PROTECTED;
+        const ALLOW_TEARING = dxgi::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
     }
 }
 
