@@ -43,7 +43,7 @@ impl Adapter {
             Adapter::enumerate_adapters_by_gpu_preference(factory, index, preference)
         };
 
-        adapter.map(move |a| {
+        adapter.map(|a| {
             let info = Adapter::get_info(a.as_raw(), factory.version);
             Adapter { inner: a, info }
         })
