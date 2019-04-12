@@ -1,13 +1,13 @@
-use graphicx::dx12;
+use framework::dx12;
 
 use std::env;
 
 use winit::os::windows::WindowExt;
 
-fn main() {
+fn main() -> dx12::D3DResult<()> {
     // Parse command line args into a config
     let args: Vec<String> = env::args().collect();
-    let mut config = graphicx::Config::new(&args);
+    let mut config = framework::Config::new(&args);
     println!("{:?}", config);
 
     let mut events_loop = winit::EventsLoop::new();
@@ -16,39 +16,40 @@ fn main() {
             f64::from(config.width),
             f64::from(config.height),
         ))
-        .with_title("Learning DirectX 12 with Rust")
+        .with_title("Rust + DirectX 12")
         .build(&events_loop)
         .unwrap();
 
-    // Enable debug layer
-    if cfg!(debug_assertions) {
-        let debug_interface = dx12::Debug::get_interface();
-        debug_interface.enable_layer();
-    }
-
     let hwnd = window.get_hwnd() as *mut _;
-    let factory = dx12::Factory4::create(if cfg!(debug_assertions) {
-        dx12::FactoryCreationFlags::DEBUG
-    } else {
-        dx12::FactoryCreationFlags::NONE
-    });
-    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NO_ALT_ENTER);
+    let factory = dx12::Factory::create()?;
+    factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NO_ALT_ENTER)?;
     let adapter = if config.use_warp {
-        factory.get_adapter_warp()
+        dx12::Adapter::enumerate_warp(&factory)
     } else {
-        factory.get_adapter()
-    };
-    let device = dx12::Device::create(&adapter);
-    let command_queue = device.create_command_queue(
+        let mut adapters = factory.get_adapters(dx12::GpuPreference::HighPerformance);
+        for adapter in &adapters {
+            println!("{:?}", adapter.info);
+        }
+        let adapter = adapters.remove(0);
+        println!(
+            "Using adapter '{}' ({}MB dedicated video memory)",
+            adapter.info.name,
+            adapter.info.video_memory / 1000 / 1000
+        );
+        Ok(adapter)
+    }?;
+    let device = dx12::Device::create(&adapter, dx12::FeatureLevel::Lvl11_0)?;
+    let command_queue = dx12::CommandQueue::create(
+        &device,
         dx12::CommandListType::Direct,
         dx12::CommandQueuePriority::Normal,
         dx12::CommandQueueFlags::NONE,
         0,
-    );
+    )?;
 
     let buffers_count: u32 = 3;
-    let is_tearing_supported = factory.is_tearing_supported();
-    let swap_chain_desc = dx12::SwapChainDesc {
+    let is_tearing_supported = factory.is_tearing_supported;
+    let swap_chain_desc = dx12::SwapChainConfig {
         width: config.width,
         height: config.height,
         format: dx12::Format::R8G8B8A8_UNORM,
@@ -57,31 +58,32 @@ fn main() {
             count: 1,
             quality: 0,
         },
-        buffer_usage: dx12::Usage::RENDER_TARGET_OUTPUT,
+        buffer_usage: dx12::BufferUsage::RENDER_TARGET_OUTPUT,
         buffer_count: buffers_count,
         scaling: dx12::Scaling::Stretch,
         swap_effect: dx12::SwapEffect::FlipDiscard,
         alpha_mode: dx12::AlphaMode::Unspecified,
         flags: if is_tearing_supported {
-            dx12::Flags::ALLOW_TEARING
+            dx12::SwapChainFlags::ALLOW_TEARING
         } else {
-            dx12::Flags::NONE
+            dx12::SwapChainFlags::NONE
         },
     };
-    let swap_chain = dx12::SwapChain4::create(&factory, &command_queue, &swap_chain_desc, hwnd);
+    let swap_chain = dx12::SwapChain::create(&factory, &command_queue, &swap_chain_desc, hwnd)?;
     let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _;
-    let descriptor_heap = device.create_descriptor_heap(
+    let descriptor_heap = dx12::DescriptorHeap::create(
+        &device,
         dx12::DescriptorHeapType::RTV,
         dx12::DescriptorHeapFlags::NONE,
         buffers_count,
         0,
-    );
+    )?;
     let descriptor_size: usize =
         device.get_descriptor_increment_size(dx12::DescriptorHeapType::RTV) as _;
     let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
     let mut back_buffers: Vec<dx12::Resource> = Vec::with_capacity(buffers_count as _);
     for i in 0..buffers_count {
-        let back_buffer = swap_chain.get_buffer(i as u32);
+        let back_buffer = swap_chain.get_buffer(i as u32)?;
 
         device.create_render_target_view(&back_buffer, descriptor);
         back_buffers.push(back_buffer);
@@ -92,14 +94,17 @@ fn main() {
     let mut command_allocators: Vec<dx12::CommandAllocator> =
         Vec::with_capacity(buffers_count as _);
     for _ in 0..buffers_count {
-        command_allocators.push(device.create_command_allocator(dx12::CommandListType::Direct));
+        let command_allocator =
+            dx12::CommandAllocator::create(&device, dx12::CommandListType::Direct)?;
+        command_allocators.push(command_allocator);
     }
-    let graphics_command_list = device.create_graphics_command_list(
+    let graphics_command_list = dx12::GraphicsCommandList::create(
+        &device,
         &command_allocators[current_back_buffer_index],
         dx12::CommandListType::Direct,
-    );
+    )?;
 
-    let fence = device.create_fence();
+    let fence = dx12::Fence::create(&device)?;
     let fence_event = dx12::Event::new(false, false);
     let mut fence_value: u64 = 0;
     let mut frame_fence_values: [u64; 3] = [0, 0, 0]; // Triple buffering
@@ -107,7 +112,7 @@ fn main() {
     let mut is_resize_requested = false;
     let mut is_fullscreen = config.is_fullscreen;
     if is_fullscreen {
-        graphicx::set_fullscreen(&window, config.is_fullscreen);
+        framework::set_fullscreen(&window, config.is_fullscreen);
     }
 
     let mut frame_counter: u64 = 0;
@@ -202,7 +207,7 @@ fn main() {
 
             // Flush the GPU queue to make sure the swap chain's back buffers
             // are not being referenced by an in-flight command list.
-            command_queue.flush(&fence, fence_event, &mut fence_value);
+            command_queue.flush(&fence, fence_event, &mut fence_value)?;
 
             // Any references to the back buffers must be released
             // before the swap chain can be resized.
@@ -215,14 +220,14 @@ fn main() {
                 frame_fence_values[i] = frame_fence_values[current_back_buffer_index];
             }
 
-            swap_chain.resize_buffers(buffers_count as _, width, height);
+            swap_chain.resize_buffers(buffers_count as _, width, height)?;
 
             current_back_buffer_index = swap_chain.get_current_back_buffer_index() as _;
 
             let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
 
             for i in 0..buffers_count {
-                let back_buffer = swap_chain.get_buffer(i as u32);
+                let back_buffer = swap_chain.get_buffer(i as u32)?;
 
                 device.create_render_target_view(&back_buffer, descriptor);
                 back_buffers.push(back_buffer);
@@ -235,15 +240,15 @@ fn main() {
 
         if config.is_fullscreen != is_fullscreen {
             config.is_fullscreen = is_fullscreen;
-            graphicx::set_fullscreen(&window, config.is_fullscreen);
+            framework::set_fullscreen(&window, config.is_fullscreen);
         }
 
         // Render
         {
             // Reset current command allocator and command list before new commands can be recorded
             let command_allocator = &command_allocators[current_back_buffer_index];
-            command_allocator.reset();
-            graphics_command_list.reset(&command_allocator);
+            command_allocator.reset()?;
+            graphics_command_list.reset(&command_allocator)?;
 
             // Clear render target
             {
@@ -268,7 +273,7 @@ fn main() {
                 )];
                 graphics_command_list.insert_transition_barriers(&barriers, &back_buffers);
 
-                graphics_command_list.close();
+                graphics_command_list.close()?;
 
                 let command_lists = vec![graphics_command_list.as_command_list()];
                 command_queue.execute(&command_lists);
@@ -279,23 +284,24 @@ fn main() {
                 } else {
                     dx12::PresentFlags::NONE
                 };
-                swap_chain.present(sync_interval, present_flags);
+                swap_chain.present(sync_interval, present_flags)?;
 
                 // Insert a signal into the command queue with a fence value
                 frame_fence_values[current_back_buffer_index] =
-                    command_queue.signal(&fence, &mut fence_value);
+                    command_queue.signal(&fence, &mut fence_value)?;
 
                 current_back_buffer_index = swap_chain.get_current_back_buffer_index() as _;
 
                 // Stall the CPU until fence value signalled is reached
-                fence.wait_for_value(fence_event, frame_fence_values[current_back_buffer_index]);
+                fence.wait_for_value(fence_event, frame_fence_values[current_back_buffer_index])?;
             }
         }
     }
 
     println!("Cleanup!");
-    command_queue.flush(&fence, fence_event, &mut fence_value);
+    command_queue.flush(&fence, fence_event, &mut fence_value)?;
     fence_event.close();
 
     println!("Bye!");
+    Ok(())
 }
