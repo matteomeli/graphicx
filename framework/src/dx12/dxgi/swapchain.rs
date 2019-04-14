@@ -1,5 +1,5 @@
 use super::factory::Factory;
-use super::{DxgiVersion, Format, PresentFlags};
+use super::{Format, PresentFlags};
 use crate::dx12::command::CommandQueue;
 use crate::dx12::resource::Resource;
 use crate::dx12::{D3DResult, Error};
@@ -83,7 +83,7 @@ bitflags! {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct SwapChainConfig {
+pub struct SwapChainDesc {
     pub width: u32,
     pub height: u32,
     pub format: Format,
@@ -105,50 +105,46 @@ impl SwapChain {
     pub fn create(
         factory: &Factory,
         command_queue: &CommandQueue,
-        config: &SwapChainConfig,
+        config: &SwapChainDesc,
         hwnd: HWND,
     ) -> D3DResult<SwapChain> {
-        if factory.version <= DxgiVersion::Dxgi1_4 {
-            Err(Error::SwapChainNotAvailable)
+        let desc = dxgi1_2::DXGI_SWAP_CHAIN_DESC1 {
+            Width: config.width,
+            Height: config.height,
+            Format: config.format as _,
+            Stereo: config.stereo as _,
+            SampleDesc: dxgitype::DXGI_SAMPLE_DESC {
+                Count: config.sample_desc.count,
+                Quality: config.sample_desc.quality,
+            },
+            BufferUsage: config.buffer_usage.bits(),
+            BufferCount: config.buffer_count,
+            Scaling: config.scaling as _,
+            SwapEffect: config.swap_effect as _,
+            AlphaMode: config.alpha_mode as _,
+            Flags: config.flags.bits(),
+        };
+
+        let mut swap_chain1: *mut dxgi1_2::IDXGISwapChain1 = ptr::null_mut();
+        let hr = unsafe {
+            (*(factory.inner.as_raw() as *mut dxgi1_2::IDXGIFactory2)).CreateSwapChainForHwnd(
+                command_queue.inner.as_raw() as *mut _,
+                hwnd,
+                &desc,
+                ptr::null(),
+                ptr::null_mut(),
+                &mut swap_chain1 as *mut *mut _ as *mut *mut _,
+            )
+        };
+
+        if winerror::SUCCEEDED(hr) {
+            let swap_chain1 = unsafe { ComPtr::from_raw(swap_chain1) };
+            let swap_chain3 = swap_chain1
+                .cast::<dxgi1_4::IDXGISwapChain3>()
+                .map_err(|_| Error::CreateSwapChainFailed)?;
+            Ok(SwapChain { inner: swap_chain3 })
         } else {
-            let desc = dxgi1_2::DXGI_SWAP_CHAIN_DESC1 {
-                Width: config.width,
-                Height: config.height,
-                Format: config.format as _,
-                Stereo: config.stereo as _,
-                SampleDesc: dxgitype::DXGI_SAMPLE_DESC {
-                    Count: config.sample_desc.count,
-                    Quality: config.sample_desc.quality,
-                },
-                BufferUsage: config.buffer_usage.bits(),
-                BufferCount: config.buffer_count,
-                Scaling: config.scaling as _,
-                SwapEffect: config.swap_effect as _,
-                AlphaMode: config.alpha_mode as _,
-                Flags: config.flags.bits(),
-            };
-
-            let mut swap_chain1: *mut dxgi1_2::IDXGISwapChain1 = ptr::null_mut();
-            let hr = unsafe {
-                (*(factory.inner.as_raw() as *mut dxgi1_2::IDXGIFactory2)).CreateSwapChainForHwnd(
-                    command_queue.inner.as_raw() as *mut _,
-                    hwnd,
-                    &desc,
-                    ptr::null(),
-                    ptr::null_mut(),
-                    &mut swap_chain1 as *mut *mut _ as *mut *mut _,
-                )
-            };
-
-            if winerror::SUCCEEDED(hr) {
-                let swap_chain1 = unsafe { ComPtr::from_raw(swap_chain1) };
-                let swap_chain3 = swap_chain1
-                    .cast::<dxgi1_4::IDXGISwapChain3>()
-                    .map_err(|_| Error::CreateSwapChainFailed)?;
-                Ok(SwapChain { inner: swap_chain3 })
-            } else {
-                Err(Error::CreateSwapChainFailed)
-            }
+            Err(Error::CreateSwapChainFailed)
         }
     }
 

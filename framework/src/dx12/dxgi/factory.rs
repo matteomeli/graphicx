@@ -1,11 +1,11 @@
 use super::adapter::Adapter;
-use super::{DxgiVersion, GpuPreference, WindowAssociationFlags};
-use crate::dx12::device::Device;
-use crate::dx12::{D3DResult, Error, FeatureLevel};
+use super::{GpuPreference, WindowAssociationFlags};
+use crate::dx12::{D3DResult, Error};
 
+use log::*;
 use winapi::shared::guiddef::GUID;
 use winapi::shared::windef::HWND;
-use winapi::shared::{dxgi, dxgi1_2, dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, winerror};
+use winapi::shared::{dxgi, dxgi1_3, dxgi1_4, dxgi1_5, dxgi1_6, minwindef, winerror};
 use winapi::um::unknwnbase::IUnknown;
 use winapi::um::{d3d12, d3d12sdklayers, dxgidebug};
 use winapi::Interface;
@@ -16,7 +16,6 @@ use std::ptr;
 
 pub struct Factory {
     pub(crate) inner: ComPtr<dxgi::IDXGIFactory>,
-    pub(crate) version: DxgiVersion,
     pub is_tearing_supported: bool,
 }
 
@@ -25,17 +24,17 @@ impl Factory {
         #[cfg(debug_assertions)]
         {
             // Enable debug layer
-            let mut debug_interface: *mut d3d12sdklayers::ID3D12Debug = ptr::null_mut();
+            let mut debug_controller: *mut d3d12sdklayers::ID3D12Debug = ptr::null_mut();
             let hr = unsafe {
                 d3d12::D3D12GetDebugInterface(
                     &d3d12sdklayers::ID3D12Debug::uuidof(),
-                    &mut debug_interface as *mut *mut _ as *mut *mut _,
+                    &mut debug_controller as *mut *mut _ as *mut *mut _,
                 )
             };
             if winerror::SUCCEEDED(hr) {
                 unsafe {
-                    (*debug_interface).EnableDebugLayer();
-                    (*debug_interface).Release();
+                    (*debug_controller).EnableDebugLayer();
+                    (*debug_controller).Release();
                 }
             }
         }
@@ -48,20 +47,28 @@ impl Factory {
         let mut adapters = Vec::new();
         loop {
             let adapter = Adapter::enumerate(self, index, preference);
-
             if adapter.is_err() {
                 break;
             }
 
+            adapters.push(adapter.unwrap());
+
             index += 1;
-
-            let adapter = adapter.unwrap();
-            if Device::create(&adapter, FeatureLevel::Lvl11_0).is_err() {
-                continue;
-            }
-
-            adapters.push(adapter);
         }
+
+        #[cfg(debug_assertions)]
+        {
+            // If no adapters have been found, try with the warp adapter
+            if adapters.is_empty() {
+                if let Ok(warp_adapter) = Adapter::enumerate_warp(self) {
+                    adapters.push(warp_adapter);
+                }
+            }
+        }
+
+        assert!(!adapters.is_empty(), "No adapter found.");
+        // TODO: In the long term, implement fallback to Direct3D11
+
         adapters
     }
 
@@ -79,91 +86,70 @@ impl Factory {
     }
 
     fn create_factory2() -> D3DResult<Factory> {
-        Factory::create_dxgi_factory2(&dxgi1_6::IDXGIFactory6::uuidof(), DxgiVersion::Dxgi1_6)
-            .or_else(|_| {
-                Factory::create_dxgi_factory2(
-                    &dxgi1_5::IDXGIFactory5::uuidof(),
-                    DxgiVersion::Dxgi1_5,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory2(
-                    &dxgi1_4::IDXGIFactory4::uuidof(),
-                    DxgiVersion::Dxgi1_4,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory2(
-                    &dxgi1_3::IDXGIFactory3::uuidof(),
-                    DxgiVersion::Dxgi1_3,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory2(
-                    &dxgi1_2::IDXGIFactory2::uuidof(),
-                    DxgiVersion::Dxgi1_2,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory2(&dxgi::IDXGIFactory1::uuidof(), DxgiVersion::Dxgi1_0)
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory2(&dxgi::IDXGIFactory::uuidof(), DxgiVersion::Dxgi1_0)
-            })
+        // Try to get the factory at the newest DXGI version
+        Factory::create_dxgi_factory2(&dxgi1_6::IDXGIFactory6::uuidof())
+            .or_else(|_| Factory::create_dxgi_factory2(&dxgi1_5::IDXGIFactory5::uuidof()))
+            .or_else(|_| Factory::create_dxgi_factory2(&dxgi1_4::IDXGIFactory4::uuidof()))
+            .or(Err(Error::CreateFactoryFailed))
     }
 
     fn create_factory1() -> D3DResult<Factory> {
-        Factory::create_dxgi_factory1(&dxgi1_6::IDXGIFactory6::uuidof(), DxgiVersion::Dxgi1_6)
-            .or_else(|_| {
-                Factory::create_dxgi_factory1(
-                    &dxgi1_5::IDXGIFactory5::uuidof(),
-                    DxgiVersion::Dxgi1_5,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory1(
-                    &dxgi1_4::IDXGIFactory4::uuidof(),
-                    DxgiVersion::Dxgi1_4,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory1(
-                    &dxgi1_3::IDXGIFactory3::uuidof(),
-                    DxgiVersion::Dxgi1_3,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory1(
-                    &dxgi1_2::IDXGIFactory2::uuidof(),
-                    DxgiVersion::Dxgi1_2,
-                )
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory1(&dxgi::IDXGIFactory1::uuidof(), DxgiVersion::Dxgi1_0)
-            })
-            .or_else(|_| {
-                Factory::create_dxgi_factory1(&dxgi::IDXGIFactory::uuidof(), DxgiVersion::Dxgi1_0)
-            })
+        // Try to get the factory at the newest DXGI version
+        Factory::create_dxgi_factory1(&dxgi1_6::IDXGIFactory6::uuidof())
+            .or_else(|_| Factory::create_dxgi_factory1(&dxgi1_5::IDXGIFactory5::uuidof()))
+            .or_else(|_| Factory::create_dxgi_factory1(&dxgi1_4::IDXGIFactory4::uuidof()))
+            .or(Err(Error::CreateFactoryFailed))
     }
 
-    fn create_dxgi_factory2(guid: &GUID, version: DxgiVersion) -> D3DResult<Factory> {
-        let mut queue: *mut dxgidebug::IDXGIInfoQueue = ptr::null_mut();
-        let hr = unsafe {
-            dxgi1_3::DXGIGetDebugInterface1(
-                0,
-                &dxgidebug::IDXGIInfoQueue::uuidof(),
-                &mut queue as *mut *mut _ as *mut *mut _,
-            )
-        };
+    fn create_dxgi_factory2(guid: &GUID) -> D3DResult<Factory> {
+        let mut factory_flags: u32 = 0;
+        #[cfg(debug_assertions)]
+        {
+            let mut dxgi_info_queue: *mut dxgidebug::IDXGIInfoQueue = ptr::null_mut();
+            let hr = unsafe {
+                dxgi1_3::DXGIGetDebugInterface1(
+                    0,
+                    &dxgidebug::IDXGIInfoQueue::uuidof(),
+                    &mut dxgi_info_queue as *mut *mut _ as *mut *mut _,
+                )
+            };
 
-        let factory_flags = if winerror::SUCCEEDED(hr) {
-            unsafe {
-                (*queue).Release();
+            if winerror::SUCCEEDED(hr) {
+                let hr = unsafe {
+                    (*dxgi_info_queue).SetBreakOnSeverity(
+                        dxgidebug::DXGI_DEBUG_ALL,
+                        dxgidebug::DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION,
+                        minwindef::TRUE,
+                    )
+                };
+                if !winerror::SUCCEEDED(hr) {
+                    warn!(
+                        "Failed on setting break on severity in DXGI info queue (code {})",
+                        hr
+                    );
+                }
+
+                let hr = unsafe {
+                    (*dxgi_info_queue).SetBreakOnSeverity(
+                        dxgidebug::DXGI_DEBUG_ALL,
+                        dxgidebug::DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR,
+                        minwindef::TRUE,
+                    )
+                };
+                if !winerror::SUCCEEDED(hr) {
+                    warn!(
+                        "Failed on setting break on severity in DXGI info queue (code {})",
+                        hr
+                    );
+                }
+
+                unsafe {
+                    (*dxgi_info_queue).Release();
+                }
+
+                factory_flags = dxgi1_3::DXGI_CREATE_FACTORY_DEBUG
             }
-            dxgi1_3::DXGI_CREATE_FACTORY_DEBUG
-        } else {
-            0
-        };
+        }
 
         let mut factory: *mut IUnknown = ptr::null_mut();
         let hr = unsafe {
@@ -174,16 +160,11 @@ impl Factory {
             )
         };
 
-        let is_tearing_supported = if version >= DxgiVersion::Dxgi1_5 {
-            Factory::is_tearing_supported(factory)
-        } else {
-            false
-        };
+        let is_tearing_supported = Factory::is_tearing_supported(factory).unwrap_or(false);
 
         if winerror::SUCCEEDED(hr) {
             Ok(Factory {
                 inner: unsafe { ComPtr::from_raw(factory as *mut _) },
-                version,
                 is_tearing_supported,
             })
         } else {
@@ -191,21 +172,16 @@ impl Factory {
         }
     }
 
-    fn create_dxgi_factory1(guid: &GUID, version: DxgiVersion) -> D3DResult<Factory> {
+    fn create_dxgi_factory1(guid: &GUID) -> D3DResult<Factory> {
         let mut factory: *mut IUnknown = ptr::null_mut();
         let hr =
             unsafe { dxgi::CreateDXGIFactory1(guid, &mut factory as *mut *mut _ as *mut *mut _) };
 
-        let is_tearing_supported = if version >= DxgiVersion::Dxgi1_5 {
-            Factory::is_tearing_supported(factory)
-        } else {
-            false
-        };
+        let is_tearing_supported = Factory::is_tearing_supported(factory).unwrap_or(false);
 
         if winerror::SUCCEEDED(hr) {
             Ok(Factory {
                 inner: unsafe { ComPtr::from_raw(factory as *mut _) },
-                version,
                 is_tearing_supported,
             })
         } else {
@@ -213,16 +189,47 @@ impl Factory {
         }
     }
 
-    fn is_tearing_supported(interface: *mut IUnknown) -> bool {
+    fn is_tearing_supported(factory: *mut IUnknown) -> D3DResult<bool> {
         let mut allow_tearing: i32 = 0;
         let hr = unsafe {
-            (*(interface as *mut dxgi1_5::IDXGIFactory5)).CheckFeatureSupport(
+            (*(factory as *mut dxgi1_5::IDXGIFactory5)).CheckFeatureSupport(
                 dxgi1_5::DXGI_FEATURE_PRESENT_ALLOW_TEARING,
                 &mut allow_tearing as *mut _ as *mut _,
                 mem::size_of::<i32>() as _,
             )
         };
 
-        winerror::SUCCEEDED(hr) && allow_tearing == 1
+        if winerror::SUCCEEDED(hr) {
+            Ok(allow_tearing == 1)
+        } else {
+            Err(Error::CheckFeatureSupportFailed)
+        }
+    }
+}
+
+impl Drop for Factory {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            // Debug tracking alive objects
+            let mut dxgi_debug_controller: *mut dxgidebug::IDXGIDebug1 = ptr::null_mut();
+            let hr = unsafe {
+                dxgi1_3::DXGIGetDebugInterface1(
+                    0,
+                    &dxgidebug::IDXGIDebug1::uuidof(),
+                    &mut dxgi_debug_controller as *mut *mut _ as *mut *mut _,
+                )
+            };
+            if winerror::SUCCEEDED(hr) {
+                unsafe {
+                    (*dxgi_debug_controller).ReportLiveObjects(
+                        dxgidebug::DXGI_DEBUG_ALL,
+                        dxgidebug::DXGI_DEBUG_RLO_SUMMARY
+                            | dxgidebug::DXGI_DEBUG_RLO_IGNORE_INTERNAL,
+                    );
+                    (*dxgi_debug_controller).Release();
+                }
+            }
+        }
     }
 }

@@ -1,5 +1,3 @@
-use winapi::um::d3dcommon;
-
 use std::error;
 use std::fmt;
 
@@ -17,10 +15,10 @@ pub use self::command::{
     GraphicsCommandList,
 };
 pub use self::descriptor::{DescriptorHeap, DescriptorHeapFlags, DescriptorHeapType};
-pub use self::device::Device;
+pub use self::device::{Device, MultiSampleQualityLevelFlags};
 pub use self::dxgi::{
     Adapter, AdapterInfo, AlphaMode, BufferUsage, Factory, Format, GpuPreference, PresentFlags,
-    SampleDesc, Scaling, SwapChain, SwapChainConfig, SwapChainFlags, SwapEffect,
+    SampleDesc, Scaling, SwapChain, SwapChainDesc, SwapChainFlags, SwapEffect,
     WindowAssociationFlags,
 };
 pub use self::resource::{Resource, ResourceStates};
@@ -35,6 +33,7 @@ pub type D3DResult<T> = Result<T, Error>;
 pub enum Error {
     AdapterNotFound,
     CreateFactoryFailed,
+    CheckFeatureSupportFailed,
     PresentSwapChainFailed,
     GetBufferFromSwapChainFailed,
     CreateSwapChainFailed,
@@ -55,6 +54,7 @@ pub enum Error {
     CreateGraphicsCommandListFailed,
     CloseGraphicsCommandListFailed,
     ResetGraphicsCommandListFailed,
+    MultiSamplingSupportCheckFailed,
 }
 
 impl Error {
@@ -62,6 +62,7 @@ impl Error {
         match *self {
             Error::AdapterNotFound => "adapter not found",
             Error::CreateFactoryFailed => "failed to create factory",
+            Error::CheckFeatureSupportFailed => "failed to check for feature support",
             Error::PresentSwapChainFailed => "failed to present the swapchain",
             Error::GetBufferFromSwapChainFailed => "failed to get buffer resource from swapchain",
             Error::CreateSwapChainFailed => "failed to create the swapchain",
@@ -82,6 +83,7 @@ impl Error {
             Error::CreateGraphicsCommandListFailed => "failed to create a graphics command list",
             Error::CloseGraphicsCommandListFailed => "failed to close graphics command list",
             Error::ResetGraphicsCommandListFailed => "failed to reset graphics command list",
+            Error::MultiSamplingSupportCheckFailed => "failed to check for multisampling support",
         }
     }
 }
@@ -100,17 +102,4 @@ impl error::Error for Error {
     fn cause(&self) -> Option<&error::Error> {
         None
     }
-}
-
-#[repr(u32)]
-pub enum FeatureLevel {
-    Lvl9_1 = d3dcommon::D3D_FEATURE_LEVEL_9_1,
-    Lvl9_2 = d3dcommon::D3D_FEATURE_LEVEL_9_2,
-    Lvl9_3 = d3dcommon::D3D_FEATURE_LEVEL_9_3,
-    Lvl10_0 = d3dcommon::D3D_FEATURE_LEVEL_10_0,
-    Lvl10_1 = d3dcommon::D3D_FEATURE_LEVEL_10_1,
-    Lvl11_0 = d3dcommon::D3D_FEATURE_LEVEL_11_0,
-    Lvl11_1 = d3dcommon::D3D_FEATURE_LEVEL_11_1,
-    Lvl12_0 = d3dcommon::D3D_FEATURE_LEVEL_12_0,
-    Lvl12_1 = d3dcommon::D3D_FEATURE_LEVEL_12_1,
 }

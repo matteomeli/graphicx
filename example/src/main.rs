@@ -23,6 +23,7 @@ fn main() -> dx12::D3DResult<()> {
     let hwnd = window.get_hwnd() as *mut _;
     let factory = dx12::Factory::create()?;
     factory.make_window_association(hwnd, dx12::WindowAssociationFlags::NO_ALT_ENTER)?;
+
     let adapter = if config.use_warp {
         dx12::Adapter::enumerate_warp(&factory)
     } else {
@@ -38,7 +39,8 @@ fn main() -> dx12::D3DResult<()> {
         );
         Ok(adapter)
     }?;
-    let device = dx12::Device::create(&adapter, dx12::FeatureLevel::Lvl11_0)?;
+
+    let device = dx12::Device::create(&adapter)?;
     let command_queue = dx12::CommandQueue::create(
         &device,
         dx12::CommandListType::Direct,
@@ -49,7 +51,7 @@ fn main() -> dx12::D3DResult<()> {
 
     let buffers_count: u32 = 3;
     let is_tearing_supported = factory.is_tearing_supported;
-    let swap_chain_desc = dx12::SwapChainConfig {
+    let swap_chain_desc = dx12::SwapChainDesc {
         width: config.width,
         height: config.height,
         format: dx12::Format::R8G8B8A8_UNORM,
@@ -73,22 +75,18 @@ fn main() -> dx12::D3DResult<()> {
     let mut current_back_buffer_index: usize = swap_chain.get_current_back_buffer_index() as _;
     let descriptor_heap = dx12::DescriptorHeap::create(
         &device,
-        dx12::DescriptorHeapType::RTV,
+        dx12::DescriptorHeapType::Rtv,
         dx12::DescriptorHeapFlags::NONE,
         buffers_count,
         0,
     )?;
-    let descriptor_size: usize =
-        device.get_descriptor_increment_size(dx12::DescriptorHeapType::RTV) as _;
-    let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
+
     let mut back_buffers: Vec<dx12::Resource> = Vec::with_capacity(buffers_count as _);
     for i in 0..buffers_count {
         let back_buffer = swap_chain.get_buffer(i as u32)?;
-
-        device.create_render_target_view(&back_buffer, descriptor);
+        let rtv_descriptor = descriptor_heap.get_cpu_descriptor_offset(i);
+        device.create_render_target_view(&back_buffer, rtv_descriptor);
         back_buffers.push(back_buffer);
-
-        descriptor.ptr += descriptor_size;
     }
 
     let mut command_allocators: Vec<dx12::CommandAllocator> =
@@ -130,7 +128,7 @@ fn main() -> dx12::D3DResult<()> {
         elapsed_time_secs += delta_time_secs;
 
         // Show fps
-        if cfg!(debug_assertions) && elapsed_time_secs > 1.0 {
+        if elapsed_time_secs > 1.0 {
             let fps = frame_counter as f64 / elapsed_time_secs;
             println!("FPS: {}", fps);
 
@@ -224,15 +222,11 @@ fn main() -> dx12::D3DResult<()> {
 
             current_back_buffer_index = swap_chain.get_current_back_buffer_index() as _;
 
-            let mut descriptor = descriptor_heap.get_cpu_descriptor_start();
-
             for i in 0..buffers_count {
                 let back_buffer = swap_chain.get_buffer(i as u32)?;
-
-                device.create_render_target_view(&back_buffer, descriptor);
+                let rtv_descriptor = descriptor_heap.get_cpu_descriptor_offset(i);
+                device.create_render_target_view(&back_buffer, rtv_descriptor);
                 back_buffers.push(back_buffer);
-
-                descriptor.ptr += descriptor_size;
             }
 
             is_resize_requested = false;
@@ -259,10 +253,9 @@ fn main() -> dx12::D3DResult<()> {
                 graphics_command_list.insert_transition_barriers(&barriers, &back_buffers);
 
                 let clear_color: [f32; 4] = [0.56, 0.93, 0.56, 1.0];
-                let mut rtv = descriptor_heap.get_cpu_descriptor_start();
-                rtv.ptr += current_back_buffer_index * descriptor_size;
-
-                graphics_command_list.clear_render_target_view(rtv, clear_color);
+                let rtv_descriptor =
+                    descriptor_heap.get_cpu_descriptor_offset(current_back_buffer_index as _);
+                graphics_command_list.clear_render_target_view(rtv_descriptor, clear_color);
             }
 
             // Present the back buffer

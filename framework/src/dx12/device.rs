@@ -1,29 +1,38 @@
 use super::descriptor::{CPUDescriptor, DescriptorHeapType};
 use super::dxgi::Adapter;
 use super::resource::Resource;
-use crate::dx12::{D3DResult, Error, FeatureLevel};
+use crate::dx12::{D3DResult, Error, Format};
 
+use bitflags::bitflags;
 use log::*;
 use winapi::shared::{minwindef, winerror};
 use winapi::um::unknwnbase::IUnknown;
-use winapi::um::{d3d12, d3d12sdklayers};
+use winapi::um::{d3d12, d3d12sdklayers, d3dcommon};
 use winapi::Interface;
 use wio::com::ComPtr;
 
 use std::mem;
 use std::ptr;
 
+bitflags! {
+    pub struct MultiSampleQualityLevelFlags : u32 {
+        const NONE = d3d12::D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
+        const TILED_RESOURCE = d3d12::D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_TILED_RESOURCE;
+    }
+}
+
 pub struct Device {
     pub(crate) inner: ComPtr<d3d12::ID3D12Device2>,
+    _feature_level: d3dcommon::D3D_FEATURE_LEVEL,
 }
 
 impl Device {
-    pub fn create(adapter: &Adapter, feature_level: FeatureLevel) -> D3DResult<Device> {
+    pub fn create(adapter: &Adapter) -> D3DResult<Device> {
         let mut device: *mut d3d12::ID3D12Device2 = ptr::null_mut();
         let hr = unsafe {
             d3d12::D3D12CreateDevice(
                 adapter.inner.as_raw() as *mut _,
-                feature_level as _,
+                d3dcommon::D3D_FEATURE_LEVEL_11_0,
                 &d3d12::ID3D12Device::uuidof(),
                 &mut device as *mut *mut _ as *mut *mut _,
             )
@@ -33,7 +42,6 @@ impl Device {
             {
                 // Setup an info queue to enable debug messages in debug mode
                 let mut info_queue: *mut d3d12sdklayers::ID3D12InfoQueue = ptr::null_mut();
-
                 let hr = unsafe {
                     (*(device as *mut IUnknown)).QueryInterface(
                         &d3d12sdklayers::ID3D12InfoQueue::uuidof(),
@@ -63,19 +71,6 @@ impl Device {
                     let hr = unsafe {
                         (*info_queue).SetBreakOnSeverity(
                             d3d12sdklayers::D3D12_MESSAGE_SEVERITY_ERROR,
-                            minwindef::TRUE,
-                        )
-                    };
-                    if !winerror::SUCCEEDED(hr) {
-                        warn!(
-                            "Failed on setting break on severity in D3D12 info queue (code {})",
-                            hr
-                        );
-                    }
-
-                    let hr = unsafe {
-                        (*info_queue).SetBreakOnSeverity(
-                            d3d12sdklayers::D3D12_MESSAGE_SEVERITY_WARNING,
                             minwindef::TRUE,
                         )
                     };
@@ -119,11 +114,40 @@ impl Device {
                             hr
                         );
                     }
+
+                    unsafe {
+                        (*info_queue).Release();
+                    }
                 }
+            }
+
+            // Check actual feature level obtained
+            let levels: [d3dcommon::D3D_FEATURE_LEVEL; 4] = [
+                d3dcommon::D3D_FEATURE_LEVEL_12_1,
+                d3dcommon::D3D_FEATURE_LEVEL_12_0,
+                d3dcommon::D3D_FEATURE_LEVEL_11_1,
+                d3dcommon::D3D_FEATURE_LEVEL_11_0,
+            ];
+            let mut feature_levels = d3d12::D3D12_FEATURE_DATA_FEATURE_LEVELS {
+                NumFeatureLevels: 4,
+                pFeatureLevelsRequested: levels.as_ptr(),
+                MaxSupportedFeatureLevel: d3dcommon::D3D_FEATURE_LEVEL_11_0,
+            };
+            let mut feature_level = d3dcommon::D3D_FEATURE_LEVEL_11_0;
+            let hr = unsafe {
+                (*device).CheckFeatureSupport(
+                    d3d12::D3D12_FEATURE_FEATURE_LEVELS,
+                    &mut feature_levels as *mut _ as *mut _,
+                    mem::size_of::<d3d12::D3D12_FEATURE_DATA_FEATURE_LEVELS>() as _,
+                )
+            };
+            if winerror::SUCCEEDED(hr) {
+                feature_level = feature_levels.MaxSupportedFeatureLevel;
             }
 
             Ok(Device {
                 inner: unsafe { ComPtr::from_raw(device) },
+                _feature_level: feature_level,
             })
         } else {
             Err(Error::CreateDeviceFailed)
@@ -141,6 +165,57 @@ impl Device {
         unsafe {
             self.inner
                 .GetDescriptorHandleIncrementSize(descriptor_heap_type as _)
+        }
+    }
+
+    pub fn get_msaa_quality(
+        &self,
+        format: Format,
+        sample_count: u32,
+        flags: MultiSampleQualityLevelFlags,
+    ) -> D3DResult<u32> {
+        let mut multisample_feature_data = d3d12::D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS {
+            Format: format as _,
+            SampleCount: sample_count,
+            Flags: flags.bits() as _,
+            NumQualityLevels: 0,
+        };
+        let hr = unsafe {
+            self.inner.CheckFeatureSupport(
+                d3d12::D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+                &mut multisample_feature_data as *mut _ as *mut _,
+                mem::size_of::<d3d12::D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS>() as _,
+            )
+        };
+        if winerror::SUCCEEDED(hr) {
+            Ok(multisample_feature_data.NumQualityLevels)
+        } else {
+            Err(Error::MultiSamplingSupportCheckFailed)
+        }
+    }
+}
+
+impl Drop for Device {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            // Debug tracking alive objects
+            let mut debug_device: *mut d3d12sdklayers::ID3D12DebugDevice = ptr::null_mut();
+            let hr = unsafe {
+                (*(self.inner.as_raw() as *mut IUnknown)).QueryInterface(
+                    &d3d12sdklayers::ID3D12DebugDevice::uuidof(),
+                    &mut debug_device as *mut *mut _ as *mut *mut _,
+                )
+            };
+            if winerror::SUCCEEDED(hr) {
+                unsafe {
+                    (*debug_device).ReportLiveDeviceObjects(
+                        d3d12sdklayers::D3D12_RLDO_DETAIL
+                            | d3d12sdklayers::D3D12_RLDO_IGNORE_INTERNAL,
+                    );
+                    (*debug_device).Release();
+                }
+            }
         }
     }
 }

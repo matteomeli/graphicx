@@ -12,7 +12,10 @@ use std::ptr;
 #[repr(u32)]
 #[derive(Copy, Clone)]
 pub enum DescriptorHeapType {
-    RTV = d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+    Rtv = d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+    Dsv = d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+    CbvSrvUav = d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+    Sampler = d3d12::D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
 }
 
 bitflags! {
@@ -25,6 +28,7 @@ pub type CPUDescriptor = d3d12::D3D12_CPU_DESCRIPTOR_HANDLE;
 
 pub struct DescriptorHeap {
     pub(crate) inner: ComPtr<d3d12::ID3D12DescriptorHeap>,
+    descriptor_size: u32,
 }
 
 impl DescriptorHeap {
@@ -52,8 +56,10 @@ impl DescriptorHeap {
             )
         };
         if winerror::SUCCEEDED(hr) {
+            let descriptor_size = device.get_descriptor_increment_size(descriptor_type);
             Ok(DescriptorHeap {
                 inner: unsafe { ComPtr::from_raw(descriptor_heap) },
+                descriptor_size,
             })
         } else {
             Err(Error::CreateDescriptorHeapFailed)
@@ -62,5 +68,11 @@ impl DescriptorHeap {
 
     pub fn get_cpu_descriptor_start(&self) -> CPUDescriptor {
         unsafe { self.inner.GetCPUDescriptorHandleForHeapStart() }
+    }
+
+    pub fn get_cpu_descriptor_offset(&self, index: u32) -> CPUDescriptor {
+        let mut cpu_descriptor = unsafe { self.inner.GetCPUDescriptorHandleForHeapStart() };
+        cpu_descriptor.ptr += (index * self.descriptor_size) as usize;
+        cpu_descriptor
     }
 }

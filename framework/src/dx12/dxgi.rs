@@ -8,7 +8,7 @@ mod swapchain;
 pub use self::adapter::{Adapter, AdapterInfo};
 pub use self::factory::Factory;
 pub use self::swapchain::{
-    AlphaMode, BufferUsage, SampleDesc, Scaling, SwapChain, SwapChainConfig, SwapChainFlags,
+    AlphaMode, BufferUsage, SampleDesc, Scaling, SwapChain, SwapChainDesc, SwapChainFlags,
     SwapEffect,
 };
 
@@ -18,16 +18,6 @@ pub enum GpuPreference {
     Unspecified = dxgi1_6::DXGI_GPU_PREFERENCE_UNSPECIFIED,
     MinimumPower = dxgi1_6::DXGI_GPU_PREFERENCE_MINIMUM_POWER,
     HighPerformance = dxgi1_6::DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum DxgiVersion {
-    Dxgi1_0 = 0,
-    Dxgi1_2 = 1,
-    Dxgi1_3 = 3,
-    Dxgi1_4 = 4,
-    Dxgi1_5 = 5,
-    Dxgi1_6 = 6,
 }
 
 #[repr(u32)]
