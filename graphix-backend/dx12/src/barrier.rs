@@ -1,4 +1,4 @@
-use super::resource::ResourceStates;
+use crate::resource::ResourceStates;
 
 use std::ops::Range;
 

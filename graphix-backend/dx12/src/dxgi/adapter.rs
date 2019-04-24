@@ -1,6 +1,6 @@
 use super::factory::Factory;
 use super::GpuPreference;
-use crate::dx12::{D3DResult, Error};
+use crate::{D3DResult, Error};
 
 use winapi::shared::{dxgi, dxgi1_4, dxgi1_6, winerror};
 use winapi::um::{d3d12, d3dcommon};

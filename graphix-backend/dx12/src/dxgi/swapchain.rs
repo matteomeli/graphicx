@@ -1,8 +1,7 @@
 use super::factory::Factory;
-use super::{Format, PresentFlags};
-use crate::dx12::command::CommandQueue;
-use crate::dx12::resource::Resource;
-use crate::dx12::{D3DResult, Error};
+use crate::command::CommandQueue;
+use crate::resource::Resource;
+use crate::{D3DResult, Error, Format, PresentFlags};
 
 use bitflags::bitflags;
 use winapi::shared::windef::HWND;

@@ -1,6 +1,6 @@
 [workspace]
-
 members = [
-    "framework",
-    "example"
+    "graphix",
+    "graphix-backend/dx12",
+    "examples"
 ]

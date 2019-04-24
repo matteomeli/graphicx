@@ -1,5 +1,5 @@
-use super::device::Device;
-use super::{D3DResult, Error};
+use crate::device::Device;
+use crate::{D3DResult, Error};
 
 use winapi::shared::winerror;
 use winapi::um::{d3d12, handleapi, synchapi, winnt};

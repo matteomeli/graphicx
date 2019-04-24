@@ -1,0 +1,21 @@
+[package]
+name = "graphix-examples"
+version = "0.1.0"
+authors = ["Matteo Meli <matteo.meli@gmail.com>"]
+workspace = ".."
+edition = "2018"
+
+[features]
+default = []
+dx12 = ["graphix-backend-dx12"]
+
+[dependencies]
+winit = "0.18"
+graphix = { path = "../graphix"}
+
+[target.'cfg(windows)'.dependencies]
+graphix-backend-dx12 = { path = "../graphix-backend/dx12", optional = true }
+
+[[bin]]
+name = "screen-clear"
+path = "screen-clear/main.rs"

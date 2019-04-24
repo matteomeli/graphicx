@@ -1,6 +1,6 @@
 use super::adapter::Adapter;
 use super::{GpuPreference, WindowAssociationFlags};
-use crate::dx12::{D3DResult, Error};
+use crate::{D3DResult, Error};
 
 use log::*;
 use winapi::shared::guiddef::GUID;

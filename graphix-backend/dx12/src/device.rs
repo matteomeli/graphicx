@@ -1,7 +1,7 @@
-use super::descriptor::{CPUDescriptor, DescriptorHeapType};
-use super::dxgi::Adapter;
-use super::resource::Resource;
-use crate::dx12::{D3DResult, Error, Format};
+use crate::descriptor::{CPUDescriptor, DescriptorHeapType};
+use crate::dxgi::Adapter;
+use crate::resource::Resource;
+use crate::{D3DResult, Error, Format};
 
 use bitflags::bitflags;
 use log::*;

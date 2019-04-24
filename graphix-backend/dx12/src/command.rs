@@ -1,9 +1,9 @@
-use super::barrier::BarrierDesc;
-use super::descriptor::CPUDescriptor;
-use super::device::Device;
-use super::resource::Resource;
-use super::sync::{Event, Fence};
-use super::{D3DResult, Error};
+use crate::barrier::BarrierDesc;
+use crate::descriptor::CPUDescriptor;
+use crate::device::Device;
+use crate::resource::Resource;
+use crate::sync::{Event, Fence};
+use crate::{D3DResult, Error};
 
 use bitflags::bitflags;
 use winapi::shared::winerror;

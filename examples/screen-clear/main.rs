@@ -1,13 +1,22 @@
-use framework::dx12;
+#![cfg_attr(
+    not(any(feature = "dx12")),
+    allow(dead_code, unused_extern_crates, unused_imports)
+)]
 
-use std::env;
+extern crate graphix;
+
+#[cfg(feature = "dx12")]
+extern crate graphix_backend_dx12 as dx12;
 
 use winit::os::windows::WindowExt;
 
+use std::env;
+
+#[cfg(feature = "dx12")]
 fn main() -> dx12::D3DResult<()> {
     // Parse command line args into a config
     let args: Vec<String> = env::args().collect();
-    let mut config = framework::Config::new(&args);
+    let mut config = graphix::Config::new(&args);
     println!("{:?}", config);
 
     let mut events_loop = winit::EventsLoop::new();
@@ -110,7 +119,7 @@ fn main() -> dx12::D3DResult<()> {
     let mut is_resize_requested = false;
     let mut is_fullscreen = config.is_fullscreen;
     if is_fullscreen {
-        framework::set_fullscreen(&window, config.is_fullscreen);
+        graphix::set_fullscreen(&window, config.is_fullscreen);
     }
 
     let mut frame_counter: u64 = 0;
@@ -234,7 +243,7 @@ fn main() -> dx12::D3DResult<()> {
 
         if config.is_fullscreen != is_fullscreen {
             config.is_fullscreen = is_fullscreen;
-            framework::set_fullscreen(&window, config.is_fullscreen);
+            graphix::set_fullscreen(&window, config.is_fullscreen);
         }
 
         // Render
@@ -297,4 +306,9 @@ fn main() -> dx12::D3DResult<()> {
 
     println!("Bye!");
     Ok(())
+}
+
+#[cfg(not(feature = "dx12"))]
+fn main() {
+    println!("You need to enable the native API feature (dx12) in order to run this example.");
 }

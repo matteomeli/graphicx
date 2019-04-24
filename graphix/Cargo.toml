@@ -1,0 +1,12 @@
+[package]
+name = "graphix"
+version = "0.1.0"
+authors = ["Matteo Meli <matteo.meli@gmail.com>"]
+workspace = ".."
+edition = "2018"
+
+[features]
+default = ["winit"]
+
+[dependencies]
+winit = { version = "0.18", optional = true }
