@@ -2,6 +2,12 @@ extern crate winit;
 
 use std::fmt;
 
+mod engine;
+mod timer;
+
+pub use self::engine::Engine;
+pub use self::timer::Timer;
+
 #[derive(Debug)]
 pub struct Config {
     pub width: u32,

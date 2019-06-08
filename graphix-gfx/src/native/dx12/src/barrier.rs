@@ -1,4 +1,4 @@
-use crate::resource::ResourceStates;
+use crate::resource::ResourceState;
 
 use std::ops::Range;
 
@@ -13,14 +13,15 @@ bitflags! {
     }
 }
 
+#[derive(Clone)]
 pub struct BarrierDesc {
     pub index: usize,
     pub flags: BarrierFlags,
-    pub states: Range<ResourceStates>,
+    pub states: Range<ResourceState>,
 }
 
 impl BarrierDesc {
-    pub fn new(index: usize, states: Range<ResourceStates>) -> Self {
+    pub fn new(index: usize, states: Range<ResourceState>) -> Self {
         BarrierDesc {
             index,
             flags: BarrierFlags::NONE,

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "graphix",
-    "graphix-backend/dx12",
+    "graphix-gfx/src/native/dx12",
+    "graphix-gfx",
     "examples"
 ]

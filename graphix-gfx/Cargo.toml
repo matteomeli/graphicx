@@ -1,0 +1,19 @@
+[package]
+name = "graphix-gfx"
+version = "0.1.0"
+authors = ["Matteo Meli <matteo.meli@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["winit"]
+
+dx12 = ["winapi", "wio", "graphix-native-dx12"]
+
+[dependencies]
+bitflags = "1.0.4"
+log = "0.4.6"
+winapi = { version = "0.3", features = ["d3d12", "d3d12sdklayers", "dxgi", "dxgi1_2", "dxgi1_3", "dxgi1_4", "dxgi1_5", "dxgi1_6", "dxgidebug", "d3dcommon", "minwindef", "synchapi", "unknwnbase", "winbase", "windef", "winerror", "winnt"], optional = true }
+wio = { version = "0.2.0", optional = true }
+graphix-native-dx12 = { path = "./src/native/dx12", version = "0.1.0", optional = true }
+winit = { version = "0.18", optional = true }
+

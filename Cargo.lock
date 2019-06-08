@@ -154,23 +154,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphix-backend-dx12"
-version = "0.1.0"
-dependencies = [
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "graphix 0.1.0",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "wio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "graphix-examples"
 version = "0.1.0"
 dependencies = [
  "graphix 0.1.0",
- "graphix-backend-dx12 0.1.0",
+ "graphix-gfx 0.1.0",
  "winit 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "graphix-gfx"
+version = "0.1.0"
+dependencies = [
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "graphix-native-dx12 0.1.0",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winit 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "graphix-native-dx12"
+version = "0.1.0"
+dependencies = [
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

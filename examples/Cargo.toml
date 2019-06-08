@@ -5,17 +5,11 @@ authors = ["Matteo Meli <matteo.meli@gmail.com>"]
 workspace = ".."
 edition = "2018"
 
-[features]
-default = []
-dx12 = ["graphix-backend-dx12"]
+[[bin]]
+name = "hello-world"
+path = "hello-world/main.rs"
 
 [dependencies]
 winit = "0.18"
-graphix = { path = "../graphix"}
-
-[target.'cfg(windows)'.dependencies]
-graphix-backend-dx12 = { path = "../graphix-backend/dx12", optional = true }
-
-[[bin]]
-name = "screen-clear"
-path = "screen-clear/main.rs"
+graphix = { path = "../graphix" }
+graphix-gfx = { path = "../graphix-gfx", features = ["dx12"] }

@@ -1,5 +1,6 @@
 use crate::device::Device;
-use crate::{D3DResult, Error};
+use crate::dxgi::Format;
+use crate::Result;
 
 use bitflags::bitflags;
 use winapi::shared::winerror;
@@ -7,6 +8,7 @@ use winapi::um::d3d12;
 use winapi::Interface;
 use wio::com::ComPtr;
 
+use std::mem;
 use std::ptr;
 
 #[repr(u32)]
@@ -25,54 +27,61 @@ bitflags! {
 }
 
 pub type CPUDescriptor = d3d12::D3D12_CPU_DESCRIPTOR_HANDLE;
+pub type GPUDescriptor = d3d12::D3D12_GPU_DESCRIPTOR_HANDLE;
 
-pub struct DescriptorHeap {
-    pub(crate) inner: ComPtr<d3d12::ID3D12DescriptorHeap>,
-    descriptor_size: u32,
-}
+pub struct DescriptorHeap(ComPtr<d3d12::ID3D12DescriptorHeap>);
 
 impl DescriptorHeap {
-    pub fn create(
+    pub fn new(
         device: &Device,
         descriptor_type: DescriptorHeapType,
         descriptor_flags: DescriptorHeapFlags,
-        descriptor_count: u32,
-        node_mask: u32,
-    ) -> D3DResult<DescriptorHeap> {
+        capacity: u64,
+        node_mask: u64,
+    ) -> Result<DescriptorHeap> {
         let mut descriptor_heap: *mut d3d12::ID3D12DescriptorHeap = ptr::null_mut();
 
         let desc = d3d12::D3D12_DESCRIPTOR_HEAP_DESC {
-            NumDescriptors: descriptor_count,
+            NumDescriptors: capacity as _,
             Type: descriptor_type as _,
             Flags: descriptor_flags.bits() as _,
-            NodeMask: node_mask,
+            NodeMask: node_mask as _,
         };
 
         let hr = unsafe {
-            device.inner.CreateDescriptorHeap(
+            device.0.CreateDescriptorHeap(
                 &desc,
                 &d3d12::ID3D12DescriptorHeap::uuidof(),
                 &mut descriptor_heap as *mut *mut _ as *mut *mut _,
             )
         };
         if winerror::SUCCEEDED(hr) {
-            let descriptor_size = device.get_descriptor_increment_size(descriptor_type);
-            Ok(DescriptorHeap {
-                inner: unsafe { ComPtr::from_raw(descriptor_heap) },
-                descriptor_size,
-            })
+            Ok(DescriptorHeap(unsafe { ComPtr::from_raw(descriptor_heap) }))
         } else {
-            Err(Error::CreateDescriptorHeapFailed)
+            Err(hr)
         }
     }
 
     pub fn get_cpu_descriptor_start(&self) -> CPUDescriptor {
-        unsafe { self.inner.GetCPUDescriptorHandleForHeapStart() }
+        unsafe { self.0.GetCPUDescriptorHandleForHeapStart() }
     }
 
-    pub fn get_cpu_descriptor_offset(&self, index: u32) -> CPUDescriptor {
-        let mut cpu_descriptor = unsafe { self.inner.GetCPUDescriptorHandleForHeapStart() };
-        cpu_descriptor.ptr += (index * self.descriptor_size) as usize;
-        cpu_descriptor
+    pub fn get_gpu_descriptor_start(&self) -> GPUDescriptor {
+        unsafe { self.0.GetGPUDescriptorHandleForHeapStart() }
+    }
+}
+
+//#[repr(transparent)]
+pub struct RenderTargetViewDesc(pub(crate) d3d12::D3D12_RENDER_TARGET_VIEW_DESC);
+
+impl RenderTargetViewDesc {
+    pub fn new(format: Format) -> Self {
+        let desc = d3d12::D3D12_RENDER_TARGET_VIEW_DESC {
+            Format: format as _,
+            ViewDimension: d3d12::D3D12_RTV_DIMENSION_TEXTURE2D,
+            ..unsafe { mem::zeroed() }
+        };
+
+        RenderTargetViewDesc(desc)
     }
 }
